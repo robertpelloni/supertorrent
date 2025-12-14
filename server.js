@@ -14,6 +14,7 @@ import Swarm from './lib/server/swarm.js'
 import parseHttpRequest from './lib/server/parse-http.js'
 import parseUdpRequest from './lib/server/parse-udp.js'
 import parseWebSocketRequest from './lib/server/parse-websocket.js'
+import { validateManifest } from './lib/manifest.js'
 
 const debug = Debug('bittorrent-tracker:server')
 const hasOwnProperty = Object.prototype.hasOwnProperty
@@ -53,6 +54,8 @@ class Server extends EventEmitter {
     this.listening = false
     this.destroyed = false
     this.torrents = {}
+    this.manifests = {} // PublicKey -> Manifest
+    this.subscriptions = {} // PublicKey -> Set<Socket>
 
     this.http = null
     this.udp4 = null
@@ -631,9 +634,81 @@ class Server extends EventEmitter {
       this._onAnnounce(params, cb)
     } else if (params && params.action === common.ACTIONS.SCRAPE) {
       this._onScrape(params, cb)
+    } else if (params && params.action === 'publish') {
+      this._onPublish(params, cb)
+    } else if (params && params.action === 'subscribe') {
+      this._onSubscribe(params, cb)
     } else {
       cb(new Error('Invalid action'))
     }
+  }
+
+  _onPublish (params, cb) {
+    try {
+      if (!validateManifest(params.manifest)) {
+        return cb(new Error('Invalid signature'))
+      }
+    } catch (e) {
+      return cb(e)
+    }
+
+    const key = params.manifest.publicKey
+    const current = this.manifests[key]
+
+    if (current && params.manifest.sequence <= current.sequence) {
+      return cb(new Error('Sequence too low'))
+    }
+
+    // Store manifest
+    this.manifests[key] = params.manifest
+    debug('Manifest updated for %s seq=%d', key, params.manifest.sequence)
+
+    // Broadcast to subscribers
+    if (this.subscriptions[key]) {
+      this.subscriptions[key].forEach(socket => {
+        if (socket.readyState === 1) { // OPEN
+          socket.send(JSON.stringify({
+            action: 'publish',
+            manifest: params.manifest
+          }))
+        }
+      })
+    }
+
+    cb(null, { action: 'publish', status: 'ok' })
+  }
+
+  _onSubscribe (params, cb) {
+    const key = params.key
+    const socket = params.socket
+
+    if (!this.subscriptions[key]) {
+      this.subscriptions[key] = new Set()
+    }
+    this.subscriptions[key].add(socket)
+
+    // Send latest if available
+    if (this.manifests[key]) {
+      socket.send(JSON.stringify({
+        action: 'publish',
+        manifest: this.manifests[key]
+      }))
+    }
+
+    // Cleanup on close
+    if (!socket._cleanupSetup) {
+      socket.on('close', () => {
+        // We have to iterate since we don't store reverse mapping efficiently here
+        // (Optimally we should store subscribed keys on socket)
+        for (const k in this.subscriptions) {
+          this.subscriptions[k].delete(socket)
+          if (this.subscriptions[k].size === 0) delete this.subscriptions[k]
+        }
+      })
+      socket._cleanupSetup = true
+    }
+
+    cb(null, { action: 'subscribe', status: 'ok' })
   }
 
   _onAnnounce (params, cb) {
