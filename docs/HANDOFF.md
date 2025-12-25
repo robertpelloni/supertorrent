@@ -52,3 +52,28 @@ Ensure `libtorrent` and `OpenSSL` are correctly linked. The provided stubs use `
 
 ### `manifest.h/cpp` (Data Structure)
 *   **Purpose:** Parses and validates the JSON Manifest format and Ed25519 signatures.
+
+### `blob_downloader.h/cpp` (Transfer)
+*   **Purpose:** Orchestrates the download of a single blob.
+*   **Logic:** Connects via `SecureSocket`, performs handshake (Protocol v5), requests blob by ID, validates SHA256 hash.
+
+## 6. GUI Integration Guide
+
+The `BitTorrent::Session` interface has been extended to support Megatorrent operations. You can now access these methods from the GUI code (e.g., `MainWindow` or a new `SubscriptionsDialog`).
+
+### Available Methods
+```cpp
+// Add a new subscription (channel)
+// publicKey: 64-char Hex String (Ed25519 Public Key)
+// label: Human readable name
+bool Session::instance()->addMegatorrentSubscription(const QString &publicKey, const QString &label);
+
+// Remove a subscription
+bool Session::instance()->removeMegatorrentSubscription(const QString &publicKey);
+```
+
+### Implementation Steps for UI Developer
+1.  Create a new `SubscriptionsWidget` or `Dialog` in `src/gui`.
+2.  Add a list view to show subscriptions (currently requires reading the JSON config file manually or extending the Session API further to `getSubscriptions`).
+3.  Add "Add Subscription" button that calls `Session::instance()->addMegatorrentSubscription(...)`.
+4.  Downloads will automatically appear in the configured Download path under a `Megatorrent` folder.
