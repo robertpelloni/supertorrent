@@ -34,5 +34,5 @@
 
 ## 🚀 Version Information
 
-**Current Version:** `1.2.0`
+**Current Version:** `1.3.0`
 **Build Date:** 2024-05-22 (Simulated)

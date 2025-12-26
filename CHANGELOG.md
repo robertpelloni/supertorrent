@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2024-05-22
+
+### Added
+- **I2P Support:** Native I2P integration via SAM v3.1 (`lib/i2p-sam.js`).
+- **Safe Mode:** Automatic DHT disabling when I2P is active.
+
+### Fixed
+- **I2P Accept Loop:** Fixed a critical bug where the initial handshake packet was discarded by the accept loop logic.
+
 ## [1.2.0] - 2024-05-22
 
 ### Added
