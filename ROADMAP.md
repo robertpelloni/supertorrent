@@ -1,6 +1,6 @@
 # Megatorrent Project Roadmap & Status
 
-**Current Version:** v1.4.1
+**Current Version:** v1.5.0
 **Protocol Version:** v5
 
 ## ✅ Accomplished Features

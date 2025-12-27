@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2024-05-23
+
+### Added
+- **C++ I2P Support:** Implemented `Megatorrent::SamSession` (SAM v3.1 Client) in C++.
+- **qBittorrent Integration:** Integrated I2P startup and shutdown logic into `SessionImpl` with safe resource management.
+
 ## [1.4.1] - 2024-05-22
 
 ### Fixed
