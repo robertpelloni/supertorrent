@@ -5,6 +5,7 @@
 #include <QMap>
 #include <QTimer>
 #include <QDateTime>
+#include <QRecursiveMutex>
 #include "dht_client.h"
 
 namespace Megatorrent {
@@ -46,6 +47,7 @@ private:
     DHTClient *m_dht;
     QMap<QByteArray, Subscription> m_subscriptions;
     QTimer *m_pollTimer;
+    mutable QRecursiveMutex m_mutex;
 };
 
 }

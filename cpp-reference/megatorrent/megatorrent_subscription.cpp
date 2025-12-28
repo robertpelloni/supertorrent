@@ -4,6 +4,7 @@
 #include <QJsonObject>
 #include <QFile>
 #include <QDebug>
+#include <QMutexLocker>
 
 namespace Megatorrent {
 
@@ -20,6 +21,7 @@ SubscriptionManager::~SubscriptionManager() {
 }
 
 void SubscriptionManager::addSubscription(const QString &label, const QByteArray &publicKey) {
+    QMutexLocker locker(&m_mutex);
     if (m_subscriptions.contains(publicKey)) return;
 
     Subscription sub;
@@ -36,22 +38,29 @@ void SubscriptionManager::addSubscription(const QString &label, const QByteArray
 }
 
 void SubscriptionManager::removeSubscription(const QByteArray &publicKey) {
+    QMutexLocker locker(&m_mutex);
     m_subscriptions.remove(publicKey);
 }
 
 QList<Subscription> SubscriptionManager::subscriptions() const {
+    QMutexLocker locker(&m_mutex);
     return m_subscriptions.values();
 }
 
 void SubscriptionManager::startPolling(int intervalMs) {
-    m_pollTimer->start(intervalMs);
+    // Timer is thread-affine, usually safe if called from same thread.
+    // If called from other thread, use meta-object system.
+    // We assume same thread or careful usage.
+    // Mutex not strictly needed for m_pollTimer pointer access if not changing it.
+    QMetaObject::invokeMethod(m_pollTimer, "start", Qt::QueuedConnection, Q_ARG(int, intervalMs));
 }
 
 void SubscriptionManager::stopPolling() {
-    m_pollTimer->stop();
+    QMetaObject::invokeMethod(m_pollTimer, "stop", Qt::QueuedConnection);
 }
 
 void SubscriptionManager::onPollTimer() {
+    QMutexLocker locker(&m_mutex);
     for (auto it = m_subscriptions.begin(); it != m_subscriptions.end(); ++it) {
         m_dht->getManifest(it.key());
         it->lastChecked = QDateTime::currentDateTime();
@@ -59,6 +68,7 @@ void SubscriptionManager::onPollTimer() {
 }
 
 void SubscriptionManager::onManifestFound(const Manifest &manifest) {
+    QMutexLocker locker(&m_mutex);
     if (!m_subscriptions.contains(manifest.publicKey)) return;
 
     Subscription &sub = m_subscriptions[manifest.publicKey];
@@ -73,6 +83,7 @@ void SubscriptionManager::onManifestFound(const Manifest &manifest) {
 }
 
 void SubscriptionManager::load(const QString &path) {
+    QMutexLocker locker(&m_mutex);
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) return;
 
@@ -95,6 +106,7 @@ void SubscriptionManager::load(const QString &path) {
 }
 
 void SubscriptionManager::save(const QString &path) {
+    QMutexLocker locker(&m_mutex);
     QJsonArray arr;
     for (const auto &sub : m_subscriptions) {
         QJsonObject obj;
