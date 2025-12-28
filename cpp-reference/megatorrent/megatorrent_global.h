@@ -52,3 +52,9 @@ void asConst(const T &&) = delete;
 using namespace Qt::Literals::StringLiterals;
 
 inline const QString TORRENT_FILE_EXTENSION = u".torrent"_s;
+
+namespace Megatorrent {
+    constexpr int PROTOCOL_VERSION = 5;
+    constexpr int BLOB_SIZE = 1048576; // 1MB
+    constexpr int OVERHEAD_SIZE = 16;  // Poly1305 MAC
+}
