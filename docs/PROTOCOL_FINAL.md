@@ -47,7 +47,7 @@ All peer-to-peer traffic is wrapped in a custom encrypted transport layer to pre
 3.  **Key Derivation:** Both derive `Tx`/`Rx` keys using BLAKE2b on the ECDH shared secret.
 
 ### 2.2 Framing
-*   Packet: `[Length (2B)] [Ciphertext (Payload + 16B MAC)]`
+*   Packet: `[Length (4B)] [Ciphertext (Payload + 16B MAC)]`
 *   Cipher: ChaCha20-Poly1305.
 
 ### 2.3 Protocol Messages
