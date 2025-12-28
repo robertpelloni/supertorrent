@@ -1,0 +1,14 @@
+{
+  "name": "video.mp4",
+  "size": 1048576,
+  "chunks": [
+    {
+      "blobId": "986cb339e3641328dd3423b24cacb84c613d12854f466c1f6d2fd797a8c10a17",
+      "offset": 0,
+      "length": 1048592,
+      "key": "a37bc32862f6aa8c19b458d318520f71618552655bb12f8602070f537a6da180",
+      "nonce": "9f6230fda1d1002b5d2415e2",
+      "realSize": 1048576
+    }
+  ]
+}

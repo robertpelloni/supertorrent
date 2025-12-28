@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "bittorrent-dht": "^11.0.11",
+    "crypto": "^1.0.1",
     "minimist": "^1.2.8",
     "nat-upnp": "^1.1.1",
     "socks": "^2.8.3",

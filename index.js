@@ -24,6 +24,7 @@ const argv = minimist(process.argv.slice(2), {
     a: 'announce-address',
     P: 'port',
     T: 'p2p-port',
+    D: 'dht-port',
     j: 'json',
     I: 'i2p'
   },
@@ -83,7 +84,10 @@ if (command === 'ingest') {
     })
   } else {
     // Interactive Mode
-    const dht = new DHTClient({ stateFile: path.join(argv.dir, 'dht_state.json') })
+    const dht = new DHTClient({
+        stateFile: path.join(argv.dir, 'dht_state.json'),
+        bootstrap: argv.bootstrap
+    })
     import('./lib/secure-transport.js').then(({ startSecureServer }) => {
       const server = startSecureServer(argv.dir, 0, null, dht)
       setTimeout(async () => {
@@ -138,14 +142,17 @@ if (command === 'publish') {
     })
   } else {
     log.info('Publishing manifest to DHT...')
-    const dht = new DHTClient({ stateFile: path.join(argv.dir, 'dht_state.json') })
+    const dht = new DHTClient({
+        stateFile: path.join(argv.dir, 'dht_state.json'),
+        bootstrap: argv.bootstrap
+    })
     dht.putManifest(keypair, sequence, manifest).then(hash => {
       log.info('Published!')
       log.info('Hash:', hash.toString('hex'))
       setTimeout(() => {
         dht.destroy()
         process.exit(0)
-      }, 2000)
+      }, 5000)
     }).catch(err => {
       log.error('Publish failed:', err)
       dht.destroy()
@@ -168,6 +175,7 @@ if (command === 'serve') {
     bootstrap: argv.bootstrap,
     announceAddress: argv['announce-address'],
     p2pPort: argv['p2p-port'],
+    dhtPort: argv['dht-port'],
     i2pSession: samSession
   })
 

@@ -16,11 +16,12 @@ dirs.forEach(dir => {
   fs.mkdirSync(dir, { recursive: true })
 })
 
-function spawnNode (name, dir, port, p2pPort, bootstrap = null) {
+function spawnNode (name, dir, port, p2pPort, dhtPort, bootstrap = null) {
   const args = ['serve', '--dir', dir, '--port', port, '--p2p-port', p2pPort]
+  if (dhtPort) args.push('--dht-port', dhtPort)
   if (bootstrap) args.push('--bootstrap', bootstrap)
 
-  console.log(`[${name}] Starting on RPC ${port}, P2P ${p2pPort}...`)
+  console.log(`[${name}] Starting on RPC ${port}, P2P ${p2pPort}, DHT ${dhtPort}...`)
   const proc = spawn(NODE, [INDEX, ...args], {
     env: { ...process.env, DEBUG: '' },
     stdio: ['ignore', 'pipe', 'pipe']
@@ -37,11 +38,13 @@ async function sleep (ms) { return new Promise(resolve => setTimeout(resolve, ms
 async function run () {
   console.log('>>> STARTING NETWORK SIMULATION <<<')
 
-  // 1. Start Nodes A, B, C
-  const nodeA = spawnNode('Node A', DATA_A, '3001', '4001')
+  // 1. Start Nodes A, B, C (Using ports 700x TCP, 800x UDP)
+  // Node A Bootstrap: None.
+  const nodeA = spawnNode('Node A', DATA_A, '6001', '7001', '8001')
   await sleep(2000)
-  const nodeB = spawnNode('Node B', DATA_B, '3002', '4002', '127.0.0.1:4001')
-  const nodeC = spawnNode('Node C', DATA_C, '3003', '4003', '127.0.0.1:4001')
+  // Node B/C Bootstrap: Node A's DHT Port (8001)
+  const nodeB = spawnNode('Node B', DATA_B, '6002', '7002', '8002', '127.0.0.1:8001')
+  const nodeC = spawnNode('Node C', DATA_C, '6003', '7003', '8003', '127.0.0.1:8001')
   await sleep(3000) // Allow DHT bootstrap
 
   // 2. Generate Content on B
@@ -78,17 +81,22 @@ async function run () {
   console.log('Restarting Node B to pick up blobs...')
   nodeB.kill()
   await sleep(1000)
-  const nodeB_restarted = spawnNode('Node B', DATA_B, '3002', '4002', '127.0.0.1:4001')
+  const nodeB_restarted = spawnNode('Node B', DATA_B, '6002', '7002', '8002', '127.0.0.1:8001')
   await sleep(2000)
 
-  // 3. Publish
+  // 3. Publish (Bootstrap to Node A DHT 8001)
   console.log('Publishing Manifest...')
-  execSync(`${NODE} ${INDEX} publish -k ${keyFile} -i ${fileEntryPath} -d ${DATA_B} --bootstrap 127.0.0.1:4001`)
+  try {
+    const pubOut = execSync(`${NODE} ${INDEX} publish -k ${keyFile} -i ${fileEntryPath} -d ${DATA_B} --bootstrap 127.0.0.1:8001`).toString()
+    console.log('[Publish CLI]', pubOut)
+  } catch (e) {
+    console.error('[Publish CLI Error]', e.message, e.stdout.toString(), e.stderr.toString())
+  }
 
   // 4. Subscribe Node C
   console.log('\n>>> NODE C: Subscribing <<<')
   try {
-    const res = await fetch('http://localhost:3003/api/rpc', {
+    const res = await fetch('http://localhost:6003/api/rpc', {
       method: 'POST',
       body: JSON.stringify({
         method: 'addSubscription',
@@ -100,8 +108,8 @@ async function run () {
     console.error('RPC Failed:', e.message)
   }
 
-  console.log('Waiting for transfer (30s)...')
-  await sleep(30000)
+  console.log('Waiting for transfer (45s)...')
+  await sleep(45000)
 
   const downloadedFile = path.join(DATA_C, 'video.mp4')
   if (fs.existsSync(downloadedFile)) {
