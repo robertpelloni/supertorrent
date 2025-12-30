@@ -55,7 +55,7 @@
 #include "base/dht_client.h"
 #include "base/blob_downloader.h"
 #include "base/i2p_sam.h"
-#include "base/blob_downloader.h"
+#include "base/bobcoin_node.h"
 #include "addtorrentparams.h"
 #include "cachestatus.h"
 #include "categoryoptions.h"
@@ -839,6 +839,7 @@ namespace BitTorrent
         Megatorrent::SubscriptionManager *m_megaSubscription = nullptr;
         Megatorrent::BlobDownloader *m_megaDownloader = nullptr;
         Megatorrent::SamSession *m_megaSam = nullptr;
+        Megatorrent::BobcoinNode *m_megaBobcoin = nullptr;
 
         Utils::Thread::UniquePtr m_ioThread;
         QThreadPool *m_asyncWorker = nullptr;

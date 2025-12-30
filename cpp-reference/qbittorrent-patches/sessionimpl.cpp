@@ -684,8 +684,10 @@ SessionImpl::SessionImpl(QObject *parent)
     m_megaDHT = new Megatorrent::DHTClient(m_nativeSession, this);
     m_megaDownloader = new Megatorrent::BlobDownloader(this);
     m_megaSubscription = new Megatorrent::SubscriptionManager(m_megaDHT, this);
+    m_megaBobcoin = new Megatorrent::BobcoinNode(this);
     m_megaSubscription->load((specialFolderLocation(SpecialFolder::Config) / Path(u"megatorrent_subscriptions.json"_s)).toString());
     m_megaSubscription->startPolling();
+    m_megaBobcoin->start();
 
     // I2P Init
     if (isI2PEnabled()) {
@@ -759,6 +761,7 @@ SessionImpl::~SessionImpl()
     delete m_megaSubscription;
     delete m_megaDownloader;
     delete m_megaDHT;
+    delete m_megaBobcoin;
 
     // We must stop "async worker" only after deletion
     // of all the components that could potentially use it
