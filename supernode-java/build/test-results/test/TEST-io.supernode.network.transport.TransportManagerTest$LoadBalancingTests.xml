@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Load Balancing" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-12T12:30:16" hostname="PINK" time="0.588">
+  <properties/>
+  <testcase name="should get transports by score" classname="io.supernode.network.transport.TransportManagerTest$LoadBalancingTests" time="0.438"/>
+  <testcase name="should fail load balanced connect with empty list" classname="io.supernode.network.transport.TransportManagerTest$LoadBalancingTests" time="0.005"/>
+  <testcase name="should select best transport" classname="io.supernode.network.transport.TransportManagerTest$LoadBalancingTests" time="0.143"/>
+  <system-out><![CDATA[07:30:16.679 [Test worker] DEBUG io.netty.util.internal.logging.InternalLoggerFactory -- Using SLF4J as the default logging framework
+07:30:16.692 [Test worker] DEBUG io.netty.channel.MultithreadEventLoopGroup -- -Dio.netty.eventLoopThreads: 64
+07:30:16.711 [Test worker] DEBUG io.netty.util.concurrent.GlobalEventExecutor -- -Dio.netty.globalEventExecutor.quietPeriodSeconds: 1
+07:30:16.725 [Test worker] DEBUG io.netty.util.internal.InternalThreadLocalMap -- -Dio.netty.threadLocalMap.stringBuilder.initialSize: 1024
+07:30:16.725 [Test worker] DEBUG io.netty.util.internal.InternalThreadLocalMap -- -Dio.netty.threadLocalMap.stringBuilder.maxSize: 4096
+07:30:16.777 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 -- -Dio.netty.noUnsafe: false
+07:30:16.778 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 -- Java version: 21
+07:30:16.780 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 -- sun.misc.Unsafe.theUnsafe: available
+07:30:16.782 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 -- sun.misc.Unsafe base methods: all available
+07:30:16.783 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 -- sun.misc.Unsafe.storeFence: available
+07:30:16.784 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 -- java.nio.Buffer.address: available
+07:30:16.785 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 -- direct buffer constructor: unavailable: Reflective setAccessible(true) disabled
+07:30:16.786 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 -- java.nio.Bits.unaligned: available, true
+07:30:16.788 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 -- jdk.internal.misc.Unsafe.allocateUninitializedArray(int): unavailable: class io.netty.util.internal.PlatformDependent0$7 cannot access class jdk.internal.misc.Unsafe (in module java.base) because module java.base does not export jdk.internal.misc to unnamed module @429bffaa
+07:30:16.790 [Test worker] DEBUG io.netty.util.internal.PlatformDependent0 -- java.nio.DirectByteBuffer.<init>(long, {int,long}): unavailable
+07:30:16.790 [Test worker] DEBUG io.netty.util.internal.PlatformDependent -- sun.misc.Unsafe: available
+07:30:16.790 [Test worker] DEBUG io.netty.util.internal.PlatformDependent -- -Dio.netty.tmpdir: C:\Users\hyper\AppData\Local\Temp (java.io.tmpdir)
+07:30:16.790 [Test worker] DEBUG io.netty.util.internal.PlatformDependent -- -Dio.netty.bitMode: 64 (sun.arch.data.model)
+07:30:16.791 [Test worker] DEBUG io.netty.util.internal.PlatformDependent -- Platform: Windows
+07:30:16.792 [Test worker] DEBUG io.netty.util.internal.PlatformDependent -- -Dio.netty.maxDirectMemory: -1 bytes
+07:30:16.793 [Test worker] DEBUG io.netty.util.internal.PlatformDependent -- -Dio.netty.uninitializedArrayAllocationThreshold: -1
+07:30:16.794 [Test worker] DEBUG io.netty.util.internal.CleanerJava9 -- java.nio.ByteBuffer.cleaner(): available
+07:30:16.794 [Test worker] DEBUG io.netty.util.internal.PlatformDependent -- -Dio.netty.noPreferDirect: false
+07:30:16.796 [Test worker] DEBUG io.netty.channel.nio.NioEventLoop -- -Dio.netty.noKeySetOptimization: false
+07:30:16.796 [Test worker] DEBUG io.netty.channel.nio.NioEventLoop -- -Dio.netty.selectorAutoRebuildThreshold: 512
+07:30:16.808 [Test worker] DEBUG io.netty.util.internal.PlatformDependent -- org.jctools-core.MpscChunkedArrayQueue: available
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Health Monitoring" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-01-12T12:30:17" hostname="PINK" time="0.627">
+  <properties/>
+  <testcase name="should get transport health status" classname="io.supernode.network.transport.TransportManagerTest$HealthMonitoringTests" time="0.307"/>
+  <testcase name="should notify on health change" classname="io.supernode.network.transport.TransportManagerTest$HealthMonitoringTests" time="0.163"/>
+  <testcase name="should return null health status for unregistered transport" classname="io.supernode.network.transport.TransportManagerTest$HealthMonitoringTests" time="0.001"/>
+  <testcase name="should get all health statuses" classname="io.supernode.network.transport.TransportManagerTest$HealthMonitoringTests" time="0.153"/>
+  <system-out><![CDATA[07:30:17.600 [Test worker] DEBUG io.netty.channel.DefaultChannelId -- -Dio.netty.processId: 42488 (auto-detected)
+07:30:17.606 [Test worker] DEBUG io.netty.util.NetUtil -- -Djava.net.preferIPv4Stack: false
+07:30:17.606 [Test worker] DEBUG io.netty.util.NetUtil -- -Djava.net.preferIPv6Addresses: false
+07:30:17.617 [Test worker] DEBUG io.netty.util.NetUtilInitializations -- Loopback interface: loopback_0 (Software Loopback Interface 1, 0:0:0:0:0:0:0:1)
+07:30:17.618 [Test worker] DEBUG io.netty.util.NetUtil -- Failed to get SOMAXCONN from sysctl and file \proc\sys\net\core\somaxconn. Default: 200
+07:30:17.624 [Test worker] DEBUG io.netty.channel.DefaultChannelId -- -Dio.netty.machineId: 00:15:5d:ff:fe:80:69:00 (auto-detected)
+07:30:17.640 [Test worker] DEBUG io.netty.util.ResourceLeakDetector -- -Dio.netty.leakDetection.level: simple
+07:30:17.641 [Test worker] DEBUG io.netty.util.ResourceLeakDetector -- -Dio.netty.leakDetection.targetRecords: 4
+07:30:17.678 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator -- -Dio.netty.allocator.numHeapArenas: 21
+07:30:17.679 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator -- -Dio.netty.allocator.numDirectArenas: 21
+07:30:17.679 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator -- -Dio.netty.allocator.pageSize: 8192
+07:30:17.679 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator -- -Dio.netty.allocator.maxOrder: 9
+07:30:17.679 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator -- -Dio.netty.allocator.chunkSize: 4194304
+07:30:17.679 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator -- -Dio.netty.allocator.smallCacheSize: 256
+07:30:17.679 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator -- -Dio.netty.allocator.normalCacheSize: 64
+07:30:17.680 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator -- -Dio.netty.allocator.maxCachedBufferCapacity: 32768
+07:30:17.680 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator -- -Dio.netty.allocator.cacheTrimInterval: 8192
+07:30:17.680 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator -- -Dio.netty.allocator.cacheTrimIntervalMillis: 0
+07:30:17.680 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator -- -Dio.netty.allocator.useCacheForAllThreads: false
+07:30:17.680 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator -- -Dio.netty.allocator.maxCachedByteBuffersPerChunk: 1023
+07:30:17.680 [Test worker] DEBUG io.netty.buffer.PooledByteBufAllocator -- -Dio.netty.allocator.disableCacheFinalizersForFastThreadLocalThreads: false
+07:30:17.694 [Test worker] DEBUG io.netty.buffer.ByteBufUtil -- -Dio.netty.allocator.type: pooled
+07:30:17.695 [Test worker] DEBUG io.netty.buffer.ByteBufUtil -- -Dio.netty.threadLocalDirectBufferSize: 0
+07:30:17.695 [Test worker] DEBUG io.netty.buffer.ByteBufUtil -- -Dio.netty.maxThreadLocalCharBufferSize: 16384
+07:30:17.698 [Test worker] DEBUG io.netty.bootstrap.ChannelInitializerExtensions -- -Dio.netty.bootstrap.extensions: null
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

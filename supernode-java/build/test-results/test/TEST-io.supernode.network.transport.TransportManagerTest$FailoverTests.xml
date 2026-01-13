@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Failover" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-01-12T12:30:16" hostname="PINK" time="0.037">
+  <properties/>
+  <testcase name="should notify on failover event" classname="io.supernode.network.transport.TransportManagerTest$FailoverTests" time="0.037"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

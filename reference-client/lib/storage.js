@@ -1,22 +1,15 @@
 import sodium from 'sodium-native'
-import crypto from 'crypto' // for SHA256 (sodium has it too but standard lib is fine for hashing)
+import crypto from 'crypto'
+import { EventEmitter } from 'events'
 
-const CHUNK_SIZE = 1024 * 1024 // 1MB chunks
+const CHUNK_SIZE = 1024 * 1024
 
-// Helper to hash a buffer
 function sha256 (buffer) {
   const hash = crypto.createHash('sha256')
   hash.update(buffer)
   return hash.digest('hex')
 }
 
-/**
- * Ingests a file buffer and returns a FileEntry (for manifest) and a list of Blobs (to store).
- *
- * @param {Buffer} fileBuffer
- * @param {string} fileName
- * @returns { fileEntry, blobs }
- */
 export function ingest (fileBuffer, fileName) {
   const totalSize = fileBuffer.length
   const chunks = []
@@ -27,24 +20,21 @@ export function ingest (fileBuffer, fileName) {
     const end = Math.min(offset + CHUNK_SIZE, totalSize)
     const chunkData = fileBuffer.slice(offset, end)
 
-    // 1. Generate Encryption Params
     const key = Buffer.alloc(sodium.crypto_aead_chacha20poly1305_ietf_KEYBYTES)
     const nonce = Buffer.alloc(sodium.crypto_aead_chacha20poly1305_ietf_NPUBBYTES)
     sodium.randombytes_buf(key)
     sodium.randombytes_buf(nonce)
 
-    // 2. Encrypt
     const ciphertext = Buffer.alloc(chunkData.length + sodium.crypto_aead_chacha20poly1305_ietf_ABYTES)
     sodium.crypto_aead_chacha20poly1305_ietf_encrypt(
       ciphertext,
       chunkData,
-      null, // aad
-      null, // nsec
+      null,
+      null,
       nonce,
       key
     )
 
-    // 3. Create Blob (In this ref impl, 1 Encrypted Chunk = 1 Blob. Future: Muxing)
     const blobBuffer = ciphertext
     const blobId = sha256(blobBuffer)
 
@@ -53,11 +43,10 @@ export function ingest (fileBuffer, fileName) {
       buffer: blobBuffer
     })
 
-    // 4. Record Metadata
     chunks.push({
       blobId,
-      offset: 0, // 1:1 mapping for now
-      length: blobBuffer.length, // length includes auth tag
+      offset: 0,
+      length: blobBuffer.length,
       key: key.toString('hex'),
       nonce: nonce.toString('hex')
     })
@@ -75,26 +64,15 @@ export function ingest (fileBuffer, fileName) {
   }
 }
 
-/**
- * Reassembles a file from a FileEntry and a getBlob function.
- *
- * @param {Object} fileEntry
- * @param {Function} getBlobFn - async (blobId) -> Buffer
- * @returns {Promise<Buffer>}
- */
 export async function reassemble (fileEntry, getBlobFn) {
   const parts = []
 
   for (const chunkMeta of fileEntry.chunks) {
-    // 1. Fetch Blob
     const blobBuffer = await getBlobFn(chunkMeta.blobId)
     if (!blobBuffer) throw new Error(`Blob ${chunkMeta.blobId} not found`)
 
-    // 2. Extract Encrypted Chunk (Handle Muxing logic here if/when implemented)
-    // For now, it's 1:1
     const ciphertext = blobBuffer.slice(chunkMeta.offset, chunkMeta.offset + chunkMeta.length)
 
-    // 3. Decrypt
     const key = Buffer.from(chunkMeta.key, 'hex')
     const nonce = Buffer.from(chunkMeta.nonce, 'hex')
     const plaintext = Buffer.alloc(ciphertext.length - sodium.crypto_aead_chacha20poly1305_ietf_ABYTES)
@@ -116,4 +94,74 @@ export async function reassemble (fileEntry, getBlobFn) {
   }
 
   return Buffer.concat(parts)
+}
+
+export class BlobClient extends EventEmitter {
+  constructor (options = {}) {
+    super()
+    this.store = options.store
+    this.network = options.network
+    this.tracker = options.tracker
+    this.maxParallel = options.maxParallel || 5
+  }
+
+  async seed (fileEntry) {
+    const blobIds = fileEntry.chunks.map(c => c.blobId)
+    
+    for (const blobId of blobIds) {
+      if (this.store.has(blobId)) {
+        this.tracker.announce(blobId)
+        this.network.announceBlob(blobId)
+      }
+    }
+    
+    this.emit('seeding', { blobIds })
+    return blobIds
+  }
+
+  async fetch (fileEntry, options = {}) {
+    const onProgress = options.onProgress || (() => {})
+    const chunks = fileEntry.chunks
+    const total = chunks.length
+    let completed = 0
+    
+    const getBlobFn = async (blobId) => {
+      if (this.store.has(blobId)) {
+        return this.store.get(blobId)
+      }
+      
+      const peers = await this.tracker.lookup(blobId)
+      
+      for (const peer of peers) {
+        try {
+          await this.network.connect(peer.address)
+        } catch {
+          continue
+        }
+      }
+      
+      this.network.queryBlob(blobId)
+      
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      const blob = await this.network.requestBlob(blobId)
+      
+      completed++
+      onProgress({ completed, total, blobId })
+      
+      return blob
+    }
+    
+    return reassemble(fileEntry, getBlobFn)
+  }
+
+  async storeBlobs (blobs) {
+    for (const blob of blobs) {
+      this.store.put(blob.id, blob.buffer)
+    }
+  }
+}
+
+export function createBlobClient (store, network, tracker) {
+  return new BlobClient({ store, network, tracker })
 }

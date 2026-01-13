@@ -1,0 +1,312 @@
+package io.supernode.storage.isoforge;
+
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+public class ContentGenerator {
+    
+    private static final List<String> ADJECTIVES = List.of(
+        "fast", "secure", "private", "decentralized", "sovereign", "free",
+        "open", "distributed", "resilient", "anonymous", "encrypted", "mesh",
+        "peer", "autonomous", "trustless", "permissionless", "censorship-resistant"
+    );
+
+    private static final List<String> NOUNS = List.of(
+        "network", "node", "system", "protocol", "infrastructure", "platform",
+        "service", "daemon", "process", "module", "component", "layer",
+        "stack", "framework", "runtime", "kernel", "filesystem", "storage"
+    );
+
+    private static final List<String> VERBS = List.of(
+        "connects", "synchronizes", "validates", "propagates", "routes",
+        "encrypts", "decrypts", "stores", "retrieves", "broadcasts",
+        "relays", "verifies", "authenticates", "authorizes", "distributes"
+    );
+
+    private static final List<String> TECH_TERMS = List.of(
+        "DHT", "P2P", "WebRTC", "WebSocket", "TCP", "UDP", "TLS", "QUIC",
+        "Ed25519", "X25519", "ChaCha20", "Poly1305", "SHA-256", "BLAKE3",
+        "Merkle tree", "bloom filter", "consistent hashing", "gossip protocol"
+    );
+
+    public static byte[] generate(SeededRNG rng, int targetSize) {
+        byte[] buffer = new byte[targetSize];
+        int offset = 0;
+
+        List<ContentItem> contentPlan = List.of(
+            new ContentItem(() -> generateReadme(rng.derive("readme")).getBytes(StandardCharsets.UTF_8)),
+            new ContentItem(() -> generateConfig(rng.derive("config")).getBytes(StandardCharsets.UTF_8)),
+            new ContentItem(() -> generateManPage(rng.derive("manpage")).getBytes(StandardCharsets.UTF_8)),
+            new ContentItem(() -> generateLog(rng.derive("log"), 4096).getBytes(StandardCharsets.UTF_8)),
+            new ContentItem(() -> generateWallpaper(rng.derive("wallpaper"), 640, 480)),
+            new ContentItem(() -> generateMachineId(rng.derive("machine-id")).getBytes(StandardCharsets.UTF_8)),
+            new ContentItem(() -> generateFstab(rng.derive("fstab")).getBytes(StandardCharsets.UTF_8)),
+            new ContentItem(() -> generateHostname(rng.derive("hostname")).getBytes(StandardCharsets.UTF_8))
+        );
+
+        for (ContentItem item : contentPlan) {
+            if (offset >= targetSize) break;
+
+            byte[] content = item.generate();
+            int toCopy = Math.min(content.length, targetSize - offset);
+            System.arraycopy(content, 0, buffer, offset, toCopy);
+            offset += toCopy;
+
+            int paddingSize = Math.min(rng.nextInt(1024), targetSize - offset);
+            if (paddingSize > 0) {
+                byte[] padding = rng.bytes(paddingSize);
+                System.arraycopy(padding, 0, buffer, offset, paddingSize);
+                offset += paddingSize;
+            }
+        }
+
+        if (offset < targetSize) {
+            SeededRNG paddingRng = rng.derive("padding");
+            while (offset < targetSize) {
+                int chunkSize = Math.min(65536, targetSize - offset);
+                byte[] padding = paddingRng.bytes(chunkSize);
+                System.arraycopy(padding, 0, buffer, offset, chunkSize);
+                offset += chunkSize;
+            }
+        }
+
+        return buffer;
+    }
+
+    public static String generateReadme(SeededRNG rng) {
+        String projectName = (rng.pick(ADJECTIVES) + "-" + rng.pick(NOUNS)).toUpperCase().replace("-", "_");
+        String version = rng.nextInt(10) + "." + rng.nextInt(20) + "." + rng.nextInt(100);
+
+        StringBuilder content = new StringBuilder();
+        content.append("# ").append(projectName).append("\n\n");
+        content.append("Version ").append(version).append("\n\n");
+        content.append("## Overview\n\n");
+        content.append(generateParagraph(rng)).append("\n\n");
+        content.append("## Features\n\n");
+
+        int featureCount = 3 + rng.nextInt(5);
+        for (int i = 0; i < featureCount; i++) {
+            String adj = rng.pick(ADJECTIVES);
+            content.append("- ").append(Character.toUpperCase(adj.charAt(0)))
+                   .append(adj.substring(1)).append(" ").append(rng.pick(NOUNS)).append(" support\n");
+        }
+
+        content.append("\n## Installation\n\n");
+        content.append("```bash\n./configure --prefix=/usr\nmake\nmake install\n```\n\n");
+        content.append("## Configuration\n\n");
+        content.append(generateParagraph(rng)).append("\n\n");
+        content.append("## License\n\nThis software is released under the MIT License.\n");
+
+        return content.toString();
+    }
+
+    public static String generateConfig(SeededRNG rng) {
+        StringBuilder content = new StringBuilder();
+        content.append("# Configuration file generated by ISO Forge\n");
+        content.append("# Seed: ").append(bytesToHex(rng.bytes(8))).append("\n\n");
+
+        List<String> sections = new ArrayList<>(List.of("network", "storage", "security", "logging", "performance"));
+        rng.shuffle(sections);
+        int sectionCount = 3 + rng.nextInt(3);
+
+        for (int i = 0; i < sectionCount && i < sections.size(); i++) {
+            content.append("[").append(sections.get(i)).append("]\n");
+
+            int optionCount = 2 + rng.nextInt(5);
+            for (int j = 0; j < optionCount; j++) {
+                String key = (rng.pick(ADJECTIVES) + "_" + rng.pick(NOUNS)).toLowerCase().replace("-", "_");
+                String value = switch (rng.nextInt(4)) {
+                    case 0 -> String.valueOf(rng.nextInt(65536));
+                    case 1 -> String.valueOf(rng.nextFloat() > 0.5);
+                    case 2 -> "\"" + rng.pick(TECH_TERMS) + "\"";
+                    default -> "0x" + bytesToHex(rng.bytes(4));
+                };
+                content.append(key).append(" = ").append(value).append("\n");
+            }
+            content.append("\n");
+        }
+
+        return content.toString();
+    }
+
+    public static String generateManPage(SeededRNG rng) {
+        String name = rng.pick(NOUNS) + "d";
+        int section = 1 + rng.nextInt(8);
+
+        StringBuilder content = new StringBuilder();
+        content.append(".TH ").append(name.toUpperCase()).append(" ").append(section)
+               .append(" \"2024-01-01\" \"Supernode\" \"Supernode Manual\"\n");
+        content.append(".SH NAME\n");
+        content.append(name).append(" \\- ").append(rng.pick(ADJECTIVES)).append(" ")
+               .append(rng.pick(NOUNS)).append(" daemon\n");
+        content.append(".SH SYNOPSIS\n.B ").append(name).append("\n");
+        content.append("[\\fB\\-c\\fR \\fIconfig\\fR]\n[\\fB\\-d\\fR]\n[\\fB\\-v\\fR]\n");
+        content.append(".SH DESCRIPTION\n.B ").append(name).append("\n");
+        content.append(rng.pick(VERBS)).append(" ").append(rng.pick(NOUNS))
+               .append(" data using ").append(rng.pick(TECH_TERMS)).append(".\n");
+        content.append(generateParagraph(rng).replace(". ", ".\n")).append("\n");
+        content.append(".SH OPTIONS\n");
+        content.append(".TP\n.B \\-c \\fIconfig\\fR\nSpecify configuration file.\n");
+        content.append(".TP\n.B \\-d\nRun as daemon.\n");
+        content.append(".TP\n.B \\-v\nVerbose output.\n");
+        content.append(".SH SEE ALSO\n.BR ").append(rng.pick(NOUNS)).append("ctl (1),\n.BR ")
+               .append(rng.pick(NOUNS)).append(".conf (5)\n");
+
+        return content.toString();
+    }
+
+    public static String generateLog(SeededRNG rng, int size) {
+        StringBuilder content = new StringBuilder();
+        long currentTime = System.currentTimeMillis() - rng.nextInt(86400000);
+
+        String[] levels = {"INFO", "DEBUG", "WARN", "ERROR"};
+        double[] weights = {0.6, 0.25, 0.1, 0.05};
+
+        while (content.length() < size) {
+            String timestamp = java.time.Instant.ofEpochMilli(currentTime).toString();
+
+            double r = rng.nextFloat();
+            String level = "INFO";
+            double cumulative = 0;
+            for (int i = 0; i < levels.length; i++) {
+                cumulative += weights[i];
+                if (r < cumulative) {
+                    level = levels[i];
+                    break;
+                }
+            }
+
+            String component = rng.pick(NOUNS);
+            String action = rng.pick(VERBS);
+            String detail = rng.pick(ADJECTIVES) + " " + rng.pick(NOUNS);
+
+            content.append(timestamp).append(" [").append(level).append("] ")
+                   .append(component).append(": ").append(action).append(" ").append(detail).append("\n");
+
+            currentTime += rng.nextInt(5000) + 100;
+        }
+
+        return content.toString();
+    }
+
+    public static byte[] generateWallpaper(SeededRNG rng, int width, int height) {
+        int fileHeaderSize = 14;
+        int dibHeaderSize = 40;
+        int rowSize = ((width * 3 + 3) / 4) * 4;
+        int pixelDataSize = rowSize * height;
+        int fileSize = fileHeaderSize + dibHeaderSize + pixelDataSize;
+
+        byte[] buffer = new byte[fileSize];
+        ByteBuffer buf = ByteBuffer.wrap(buffer).order(ByteOrder.LITTLE_ENDIAN);
+
+        buffer[0] = 'B';
+        buffer[1] = 'M';
+        buf.putInt(2, fileSize);
+        buf.putInt(10, fileHeaderSize + dibHeaderSize);
+
+        buf.putInt(14, dibHeaderSize);
+        buf.putInt(18, width);
+        buf.putInt(22, height);
+        buf.putShort(26, (short) 1);
+        buf.putShort(28, (short) 24);
+        buf.putInt(34, pixelDataSize);
+        buf.putInt(38, 2835);
+        buf.putInt(42, 2835);
+
+        int r1 = rng.nextInt(256), g1 = rng.nextInt(256), b1 = rng.nextInt(256);
+        int r2 = rng.nextInt(256), g2 = rng.nextInt(256), b2 = rng.nextInt(256);
+
+        for (int y = 0; y < height; y++) {
+            int rowOffset = fileHeaderSize + dibHeaderSize + y * rowSize;
+            for (int x = 0; x < width; x++) {
+                double t = (double) (x + y) / (width + height);
+                int r = (int) (r1 * (1 - t) + r2 * t);
+                int g = (int) (g1 * (1 - t) + g2 * t);
+                int b = (int) (b1 * (1 - t) + b2 * t);
+
+                buffer[rowOffset + x * 3] = (byte) b;
+                buffer[rowOffset + x * 3 + 1] = (byte) g;
+                buffer[rowOffset + x * 3 + 2] = (byte) r;
+            }
+        }
+
+        return buffer;
+    }
+
+    public static String generateMachineId(SeededRNG rng) {
+        return bytesToHex(rng.bytes(16)) + "\n";
+    }
+
+    public static String generateFstab(SeededRNG rng) {
+        StringBuilder content = new StringBuilder();
+        content.append("# /etc/fstab: static file system information\n#\n");
+        content.append("# <file system>  <mount point>  <type>  <options>  <dump>  <pass>\n");
+        content.append("/dev/sda1        /              ext4    defaults   0       1\n");
+        content.append("/dev/sda2        none           swap    sw         0       0\n");
+        content.append("tmpfs            /tmp           tmpfs   defaults   0       0\n");
+
+        if (rng.nextFloat() > 0.5) {
+            String uuid = bytesToHex(rng.bytes(16));
+            content.append("UUID=").append(uuid, 0, 8).append("-").append(uuid, 8, 12)
+                   .append("-").append(uuid, 12, 16).append("-").append(uuid, 16, 20)
+                   .append("-").append(uuid, 20, 32).append(" /data ext4 defaults 0 2\n");
+        }
+
+        return content.toString();
+    }
+
+    public static String generateHostname(SeededRNG rng) {
+        List<String> prefixes = List.of("node", "mesh", "peer", "relay", "seed", "super");
+        return rng.pick(prefixes) + "-" + bytesToHex(rng.bytes(4)) + "\n";
+    }
+
+    private static String generateParagraph(SeededRNG rng) {
+        int sentenceCount = 3 + rng.nextInt(5);
+        StringBuilder para = new StringBuilder();
+        for (int i = 0; i < sentenceCount; i++) {
+            if (i > 0) para.append(" ");
+            para.append(generateSentence(rng));
+        }
+        return para.toString();
+    }
+
+    private static String generateSentence(SeededRNG rng) {
+        return switch (rng.nextInt(6)) {
+            case 0 -> "The " + rng.pick(ADJECTIVES) + " " + rng.pick(NOUNS) + " " + 
+                     rng.pick(VERBS) + " data across the " + rng.pick(NOUNS) + ".";
+            case 1 -> "Using " + rng.pick(TECH_TERMS) + ", the " + rng.pick(NOUNS) + 
+                     " achieves " + rng.pick(ADJECTIVES) + " " + rng.pick(NOUNS) + " capabilities.";
+            case 2 -> "This " + rng.pick(ADJECTIVES) + " " + rng.pick(NOUNS) + " " + 
+                     rng.pick(VERBS) + " with other " + rng.pick(NOUNS) + "s in the network.";
+            case 3 -> rng.pick(TECH_TERMS) + " enables " + rng.pick(ADJECTIVES) + 
+                     " communication between " + rng.pick(NOUNS) + "s.";
+            case 4 -> "The " + rng.pick(NOUNS) + " layer " + rng.pick(VERBS) + 
+                     " all " + rng.pick(ADJECTIVES) + " " + rng.pick(NOUNS) + " traffic.";
+            default -> "For " + rng.pick(ADJECTIVES) + " operation, the " + rng.pick(NOUNS) + 
+                      " uses " + rng.pick(TECH_TERMS) + ".";
+        };
+    }
+
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder hex = new StringBuilder();
+        for (byte b : bytes) {
+            hex.append(String.format("%02x", b));
+        }
+        return hex.toString();
+    }
+
+    @FunctionalInterface
+    private interface ContentSupplier {
+        byte[] get();
+    }
+
+    private record ContentItem(ContentSupplier supplier) {
+        byte[] generate() {
+            return supplier.get();
+        }
+    }
+}

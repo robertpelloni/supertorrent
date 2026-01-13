@@ -1,12 +1,14 @@
 import stringify from 'fast-json-stable-stringify'
 import { sign, verify } from './crypto.js'
 
-export function createManifest (keypair, sequence, collections) {
+export function createManifest (keypair, sequence, collections, options = {}) {
   const payload = {
     publicKey: keypair.publicKey.toString('hex'),
     sequence,
     timestamp: Date.now(),
-    collections
+    collections,
+    ...(options.topics && { topics: options.topics }),
+    ...(options.metadata && { metadata: options.metadata })
   }
 
   // Canonicalize string for signing
@@ -30,7 +32,9 @@ export function validateManifest (manifest) {
     publicKey: manifest.publicKey,
     sequence: manifest.sequence,
     timestamp: manifest.timestamp,
-    collections: manifest.collections
+    collections: manifest.collections,
+    ...(manifest.topics && { topics: manifest.topics }),
+    ...(manifest.metadata && { metadata: manifest.metadata })
   }
 
   const jsonString = stringify(payload)
