@@ -82,7 +82,30 @@ All notable changes to Supernode Java.
 - Enhanced `DHTDiscovery` with improved peer tracking and network health
   - Added peer reputation scoring system
   - Enhanced network health monitoring across DHT nodes
-  - Improved announce and lookup operations with retry logic
+   - Improved announce and lookup operations with retry logic
+
+#### Storage Layer (Erasure Coding Enhancements)
+- Enhanced `ErasureCoder` with advanced features for production workloads
+  - Added streaming erasure coding support for large files (>1GB)
+  - Implemented `encodeStream()` and `decodeStream()` methods for chunk-based processing
+  - Fixed-size chunk processing with configurable overlap for seamless recovery
+  - Thread-safe implementation using `ReentrantReadWriteLock`
+  - Added Reed-Solomon (6+2) configuration option for higher redundancy
+  - Added factory methods: `createStandard()`, `createHighRedundancy()`, `createExtremeRedundancy()`, `createWithContext()`
+  - Implemented parity shard verification and automatic repair
+  - Added `verifyParity()` - Validates parity shards by recomputing from data shards
+  - Added `repairParity()` - Automatic parity repair using data shards
+  - Added SHA-256 checksum computation and caching for all shards
+  - Implemented adaptive shard selection based on network conditions
+  - Added `NetworkContext` class for tracking network health, latency, and peer metrics
+  - Added `selectOptimalShardCount()` - Dynamically adjusts parity shards based on network quality
+  - Added peer scoring and selection with multi-factor evaluation
+  - Added comprehensive event emission: `onEncoding()`, `onDecoding()`, `onRepair()`
+  - Events include timestamps, shard counts, and processed bytes
+  - Thread-safe statistics with `AtomicLong` counters
+  - Methods: `getEncodeCount()`, `getDecodeCount()`, `getRepairCount()`
+  - Maintains backward compatibility with existing 4+2 configuration
+  - All new features are optional and additive
 - Enhanced `SupernodeNetwork` with unified API across all transports
   - Single entry point for storage and network operations
   - Integrated `BlobNetwork`, `DHTDiscovery`, and `TransportManager`
