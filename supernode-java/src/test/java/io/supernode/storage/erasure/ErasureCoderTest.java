@@ -380,9 +380,9 @@ class ErasureCoderTest {
             ErasureCoder.EncodeResult enc1 = coder.encode(data1);
             ErasureCoder.EncodeResult enc2 = coder.encode(data2);
             
-            for (int p = DATA_SHARDS; p < enc1.shards().length; p++) {
+            for (int p = 0; p < enc1.shards().length; p++) {
                 assertFalse(Arrays.equals(enc1.shards()[p], enc2.shards()[p]),
-                    "Parity shard " + p + " should differ for different data");
+                    "All shards (data + parity) should differ for different data");
             }
         }
     }

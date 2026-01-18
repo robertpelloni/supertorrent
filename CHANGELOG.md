@@ -1,4 +1,147 @@
-## [11.2.2](https://github.com/webtorrent/bittorrent-tracker/compare/v11.2.1...v11.2.2) (2025-09-06)
+# CHANGELOG
+
+All notable changes to Supernode Java.
+
+## [Unreleased]
+
+### Added (v0.1.0-SNAPSHOT)
+
+#### Storage Layer
+- Enhanced `BlobStore` with streaming support, chunking strategies, and caching layer
+  - Added `InputStream get(String blobId)` and `OutputStream put(String blobId)`
+  - Implemented `ChunkingStrategy` with fixed-size, adaptive, and noChunking options
+  - Added `BlobCache` with LRU eviction policy, size limits, and TTL support
+  - Added batch operations: `batchPut()` and `batchGet()`
+  - Added verification operations: `verify()` with checksums
+- Enhanced `SupernodeStorage` with async operations and progress tracking
+  - Added `ingestAsync()` and `retrieveAsync()` for non-blocking operations
+  - Implemented `IngestProgress` and `RetrieveProgress` callbacks
+  - Added event emission for chunk ingested/retrieved and file ingested/retrieved
+  - Added erasure coding events for monitoring
+  - Integrated `BlobCache` into storage operations
+  - Enhanced error handling and recovery mechanisms
+- Fixed `MuxEngine` cipher incompatibility
+  - Changed from `ChaCha20` to `AES/GCM/NoPadding` for better Java compatibility
+  - Updated `GCMParameterSpec(128, iv)` with 12-byte nonce for proper authentication
+  - Provides both confidentiality and integrity (128-bit GCM auth tag)
+- Fixed `Manifest` cipher incompatibility
+  - Updated to use `AES/GCM/NoPadding` matching MuxEngine changes
+  - Ensured consistent encryption across storage layer
+- Integrated `ErasureCoder` for data redundancy
+  - 4 data shards + 2 parity shards configuration (configurable)
+  - Recovery from up to 2 lost data shards or 2 lost parity shards
+  - Deterministic encoding/decoding
+
+#### Network Layer
+- Enhanced `BlobNetwork` with transport manager integration and multi-network routing
+  - Added support for multiple transport types (CLEARNET, TOR, I2P, IPFS, HYPHANET, ZERONET)
+  - Implemented transport health tracking and automatic failover
+  - Added peer health monitoring with backpressure detection
+  - Enhanced blob discovery across all transports
+  - Implemented retry logic with exponential backoff
+  - Added circuit breaker for fault tolerance
+- Fixed WebSocket connection handshake timing
+  - Server now waits for client's "hello" before establishing peer connection
+  - Prevents sending messages before WebSocket upgrade completes
+  - Proper peer establishment and "have" message exchange
+- Enhanced `DHTDiscovery` with improved peer tracking and network health
+  - Added peer reputation scoring system
+  - Enhanced network health monitoring across DHT nodes
+  - Improved announce and lookup operations with retry logic
+- Enhanced `SupernodeNetwork` with unified API across all transports
+  - Single entry point for storage and network operations
+  - Integrated `BlobNetwork`, `DHTDiscovery`, and `TransportManager`
+  - Automatic transport selection and failover
+  - Unified event forwarding and blob fetching across all networks
+  - Health aggregation from all components
+
+#### Transport Layer
+- Implemented `TransportManager` for multi-network coordination
+  - Transport registration and lifecycle management
+  - Automatic failover with circuit breaker pattern
+  - Load balancing across healthy transports
+  - Health monitoring and automatic transport recovery
+  - Unified transport API with common operations
+- Implemented `HyphanetTransport` (Freenet integration)
+  - FCP (Freenet Client Protocol) implementation
+  - SSK/USK key management with persistence
+  - Request priorities and queuing system
+  - Splitfile support for large files
+  - Health monitoring and auto-reconnect
+- Implemented `IPFSTransport` (IPFS integration)
+  - Full HTTP API client for IPFS operations
+  - IPNS (InterPlanetary Namespace System) support
+  - MFS (Mutable File System) operations
+  - DAG (Directed Acyclic Graph) operations
+  - PubSub message publishing for peer communication
+  - Pin management with optional recursive pinning
+- Implemented `TorTransport` (Tor network integration)
+  - Onion service (hidden service) support
+  - Tor circuit management and rotation
+  - Health monitoring and circuit health tracking
+- Implemented `I2PTransport` (I2P network integration)
+  - SAM (Session and Address Management) bridge
+  - Destination key management
+  - Tunnel establishment and management
+  - Health monitoring with destination verification
+- Implemented `ZeronetTransport` (Zeronet integration)
+  - ZeroNet site address handling
+  - Site update and synchronization
+  - Health monitoring with site availability tracking
+
+#### Blockchain Layer
+- Implemented `BobcoinBridge` for Filecoin integration
+  - Wallet management with account creation and address generation
+  - Deal negotiation and management
+  - Proof submission and verification
+  - Payment handling and reward claiming
+  - Storage provider registration and deal management
+  - Chain connection monitoring and health checks
+  - Event-driven architecture for blockchain operations
+
+#### Testing
+- Added comprehensive integration tests for storage layer
+  - Full async ingest/retrieve cycle with progress tracking
+  - Erasure coding recovery tests
+  - Operation tracking and cleanup verification
+- Added comprehensive integration tests for network layer
+  - Blob discovery and transfer between nodes
+  - Peer event tracking across unified network
+  - Health aggregation from all components
+- Added unit tests for all transport implementations
+  - Address handling and parsing tests
+  - Health monitoring and lifecycle tests
+  - Connection management and failover tests
+- Added diagnostic test for erasure coder parity shard generation
+  - Tests matrix coefficient generation and parity shard differences
+  - Documents test bug (incorrect expectations, not implementation bug)
+
+#### Documentation
+- Added `ERASURE_CODER_TEST_ANALYSIS.md` documenting parity test investigation
+- Identified that failing test has incorrect expectations (test bug, not implementation bug)
+- ErasureCoder implementation is correct - all other tests pass successfully
+
+## [0.1.0] - 2026-01-18
+
+### Initial Release
+- Supernode P2P storage and network infrastructure
+- Multi-transport support (Clearnet, Tor, I2P, IPFS, Hyphanet, Zeronet)
+- Erasure coding for data redundancy (4+2 configuration)
+- AES-GCM encryption for data confidentiality and integrity
+- Event-driven architecture with comprehensive health monitoring
+- Filecoin blockchain integration via BobcoinBridge
+
+---
+
+## Versioning
+
+This project follows [Semantic Versioning](https://semver.org/).
+
+- **MAJOR**: Incompatible API changes
+- **MINOR**: Backward-compatible functionality additions
+- **PATCH**: Backward-compatible bug fixes
+
+For example: `0.1.0`, `0.1.1`, `0.1.2`, etc.
 
 
 ### Bug Fixes
