@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="Address Resolution" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-01-12T12:30:18" hostname="PINK" time="0.348">
-  <properties/>
-  <testcase name="should get local addresses after start" classname="io.supernode.network.transport.TransportManagerTest$AddressResolutionTests" time="0.187"/>
-  <testcase name="should return null for unparseable address" classname="io.supernode.network.transport.TransportManagerTest$AddressResolutionTests" time="0.001"/>
-  <testcase name="should parse clearnet address" classname="io.supernode.network.transport.TransportManagerTest$AddressResolutionTests" time="0.158"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

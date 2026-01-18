@@ -228,9 +228,15 @@ public class HyphanetTransport implements Transport {
 
     @Override
     public TransportAddress parseAddress(String address) {
-        if (CHK_PATTERN.matcher(address).matches() ||
-            SSK_PATTERN.matcher(address).matches() ||
-            USK_PATTERN.matcher(address).matches()) {
+        String normalizedAddress = address;
+        
+        if (address.startsWith("freenet:")) {
+            normalizedAddress = address.substring("freenet:".length());
+        }
+        
+        if (CHK_PATTERN.matcher(normalizedAddress).matches() ||
+            SSK_PATTERN.matcher(normalizedAddress).matches() ||
+            USK_PATTERN.matcher(normalizedAddress).matches()) {
             return TransportAddress.hyphanet(address);
         }
         return null;
@@ -240,7 +246,8 @@ public class HyphanetTransport implements Transport {
     public boolean canHandle(String address) {
         return address.startsWith("CHK@") || 
                address.startsWith("SSK@") || 
-               address.startsWith("USK@");
+               address.startsWith("USK@") ||
+               address.startsWith("freenet:");
     }
 
     @Override

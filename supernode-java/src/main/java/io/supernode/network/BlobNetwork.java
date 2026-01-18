@@ -1,5 +1,6 @@
 package io.supernode.network;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
@@ -26,9 +27,13 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
+/**
+ * P2P network layer for blob exchange using WebSockets over Netty.
+ */
 public class BlobNetwork {
     
     private static final int MAX_FRAME_SIZE = 64 * 1024;
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     
     private final BlobStore blobStore;
     private final String peerId;
@@ -191,22 +196,25 @@ public class BlobNetwork {
     }
     
     public CompletableFuture<PeerConnection> connectViaTransport(TransportAddress address) {
+        String host = "localhost".equals(address.host()) ? "127.0.0.1" : address.host();
         String wsAddress = switch (address.type()) {
-            case CLEARNET -> "ws://" + address.host() + ":" + address.port();
-            case TOR -> "ws://" + address.host();
-            case I2P -> "ws://" + address.host();
+            case CLEARNET -> "ws://" + host + ":" + address.port();
+            case TOR -> "ws://" + host;
+            case I2P -> "ws://" + host;
             default -> throw new IllegalArgumentException("Unsupported transport: " + address.type());
         };
         return connect(wsAddress);
     }
     
     public void announceBlob(String blobId) {
+        if (blobId == null) return;
         announcedBlobs.add(blobId);
         Message haveMsg = new Message("have", Map.of("blobId", blobId));
         broadcastMessage(haveMsg);
     }
     
     public void queryBlob(String blobId) {
+        if (blobId == null) return;
         Message queryMsg = new Message("query", Map.of("blobId", blobId));
         broadcastMessage(queryMsg);
         totalRequestsSent.incrementAndGet();
@@ -221,6 +229,8 @@ public class BlobNetwork {
     }
     
     public CompletableFuture<byte[]> requestBlob(String blobId, List<PeerConnection> targetPeers) {
+        if (blobId == null) return CompletableFuture.failedFuture(new IllegalArgumentException("blobId is null"));
+        
         CompletableFuture<byte[]> future = new CompletableFuture<>();
         pendingRequests.put(blobId, future);
         totalRequestsSent.incrementAndGet();
@@ -279,6 +289,7 @@ public class BlobNetwork {
     }
     
     public List<PeerConnection> findPeersWithBlob(String blobId) {
+        if (blobId == null) return Collections.emptyList();
         Set<String> peerIds = blobToPeers.get(blobId);
         if (peerIds == null) return Collections.emptyList();
         
@@ -304,6 +315,7 @@ public class BlobNetwork {
     }
     
     public Optional<PeerHealth> getPeerHealth(String peerId) {
+        if (peerId == null) return Optional.empty();
         return Optional.ofNullable(peerHealth.get(peerId));
     }
     
@@ -344,7 +356,7 @@ public class BlobNetwork {
     
     public void destroy() {
         destroyed = true;
-        updateHealthState(Transport.HealthState.UNHEALTHY);
+        updateHealthState(Transport.HealthState.STOPPED);
         
         if (serverChannel != null) {
             serverChannel.close();
@@ -388,6 +400,7 @@ public class BlobNetwork {
     }
     
     private void recordRequestSent(String peerId) {
+        if (peerId == null) return;
         peerHealth.compute(peerId, (k, v) -> {
             if (v == null) {
                 return new PeerHealth(peerId, 0, 0, 0, Duration.ZERO, Instant.now(), PeerHealthState.UNKNOWN, 50.0);
@@ -398,6 +411,7 @@ public class BlobNetwork {
     }
     
     private void recordResponseReceived(String peerId, Duration latency, boolean success) {
+        if (peerId == null) return;
         peerHealth.compute(peerId, (k, v) -> {
             if (v == null) {
                 return new PeerHealth(peerId, 0, success ? 1 : 0, success ? 0 : 1, 
@@ -447,12 +461,12 @@ public class BlobNetwork {
     }
     
     private void handleHello(Channel channel, String remotePeerId, Message message) {
+        InetSocketAddress addr = (InetSocketAddress) channel.remoteAddress();
         PeerConnection peer = new PeerConnection(remotePeerId, channel, System.currentTimeMillis(), 
-            TransportType.CLEARNET, null);
+            TransportType.CLEARNET, null, addr.getHostString(), addr.getPort());
         peers.put(remotePeerId, peer);
         
         if (onPeer != null) {
-            InetSocketAddress addr = (InetSocketAddress) channel.remoteAddress();
             onPeer.accept(new PeerConnectedEvent(remotePeerId, addr.getHostString(), addr.getPort(), 
                 TransportType.CLEARNET));
         }
@@ -464,7 +478,10 @@ public class BlobNetwork {
     }
     
     private void handleHave(String peerId, Message message) {
+        if (peerId == null || message.payload() == null) return;
         String blobId = (String) message.payload().get("blobId");
+        if (blobId == null) return;
+        
         blobToPeers.computeIfAbsent(blobId, k -> ConcurrentHashMap.newKeySet()).add(peerId);
         
         if (onHave != null) {
@@ -473,7 +490,10 @@ public class BlobNetwork {
     }
     
     private void handleQuery(Channel channel, Message message) {
+        if (message.payload() == null) return;
         String blobId = (String) message.payload().get("blobId");
+        if (blobId == null) return;
+        
         totalRequestsReceived.incrementAndGet();
         
         if (blobStore.has(blobId) || announcedBlobs.contains(blobId)) {
@@ -483,7 +503,10 @@ public class BlobNetwork {
     }
     
     private void handleRequest(Channel channel, Message message) {
+        if (message.payload() == null) return;
         String blobId = (String) message.payload().get("blobId");
+        if (blobId == null) return;
+        
         totalRequestsReceived.incrementAndGet();
         Optional<byte[]> data = blobStore.get(blobId);
         
@@ -500,8 +523,11 @@ public class BlobNetwork {
     }
     
     private void handleBlob(String peerId, Message message) {
+        if (peerId == null || message.payload() == null) return;
         String blobId = (String) message.payload().get("blobId");
         String base64Data = (String) message.payload().get("data");
+        if (blobId == null || base64Data == null) return;
+        
         byte[] data = Base64.getDecoder().decode(base64Data);
         
         blobStore.put(blobId, data);
@@ -537,52 +563,20 @@ public class BlobNetwork {
     }
     
     private void sendMessage(Channel channel, Message message) {
-        String json = encodeMessage(message);
-        channel.writeAndFlush(new TextWebSocketFrame(json));
-    }
-    
-    private String encodeMessage(Message message) {
-        StringBuilder sb = new StringBuilder("{\"type\":\"");
-        sb.append(message.type()).append("\"");
-        if (message.payload() != null && !message.payload().isEmpty()) {
-            sb.append(",\"payload\":{");
-            boolean first = true;
-            for (Map.Entry<String, Object> entry : message.payload().entrySet()) {
-                if (!first) sb.append(",");
-                sb.append("\"").append(entry.getKey()).append("\":\"").append(entry.getValue()).append("\"");
-                first = false;
-            }
-            sb.append("}");
+        try {
+            String json = MAPPER.writeValueAsString(message);
+            channel.writeAndFlush(new TextWebSocketFrame(json));
+        } catch (Exception e) {
+            // Log error
         }
-        sb.append("}");
-        return sb.toString();
     }
     
     private Message decodeMessage(String json) {
-        String type = extractJsonString(json, "type");
-        Map<String, Object> payload = new HashMap<>();
-        
-        int payloadStart = json.indexOf("\"payload\"");
-        if (payloadStart != -1) {
-            String blobId = extractJsonString(json, "blobId");
-            if (blobId != null) payload.put("blobId", blobId);
-            String data = extractJsonString(json, "data");
-            if (data != null) payload.put("data", data);
-            String peerId = extractJsonString(json, "peerId");
-            if (peerId != null) payload.put("peerId", peerId);
+        try {
+            return MAPPER.readValue(json, Message.class);
+        } catch (Exception e) {
+            return new Message("error", Map.of("error", e.getMessage()));
         }
-        
-        return new Message(type, payload);
-    }
-    
-    private String extractJsonString(String json, String key) {
-        String search = "\"" + key + "\":\"";
-        int start = json.indexOf(search);
-        if (start == -1) return null;
-        start += search.length();
-        int end = json.indexOf("\"", start);
-        if (end == -1) return null;
-        return json.substring(start, end);
     }
     
     private static String generatePeerId() {
@@ -593,21 +587,43 @@ public class BlobNetwork {
     
     private class BlobNetworkServerHandler extends SimpleChannelInboundHandler<WebSocketFrame> {
         private String remotePeerId;
-        
-        @Override
-        public void channelActive(ChannelHandlerContext ctx) {
-            Message hello = new Message("hello", Map.of("peerId", peerId));
-            sendMessage(ctx.channel(), hello);
-        }
-        
+        private boolean handshakeCompleted = false;
+
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, WebSocketFrame frame) {
             if (frame instanceof TextWebSocketFrame textFrame) {
                 Message msg = decodeMessage(textFrame.text());
                 if ("hello".equals(msg.type())) {
-                    remotePeerId = (String) msg.payload().get("peerId");
+                    if (!handshakeCompleted) {
+                        handshakeCompleted = true;
+                        remotePeerId = (String) msg.payload().get("peerId");
+                        PeerConnection peer = new PeerConnection(remotePeerId, ctx.channel(),
+                            System.currentTimeMillis(), TransportType.CLEARNET, null,
+                            ((InetSocketAddress) ctx.channel().remoteAddress()).getHostString(),
+                            ((InetSocketAddress) ctx.channel().remoteAddress()).getPort());
+                        peers.put(remotePeerId, peer);
+
+                        if (onPeer != null) {
+                            onPeer.accept(new PeerConnectedEvent(remotePeerId,
+                                ((InetSocketAddress) ctx.channel().remoteAddress()).getHostString(),
+                                ((InetSocketAddress) ctx.channel().remoteAddress()).getPort(),
+                                TransportType.CLEARNET));
+                        }
+
+                        Message helloReply = new Message("hello", Map.of("peerId", peerId));
+                        sendMessage(ctx.channel(), helloReply);
+
+                        for (String blobId : announcedBlobs) {
+                            Message haveMsg = new Message("have", Map.of("blobId", blobId));
+                            sendMessage(ctx.channel(), haveMsg);
+                        }
+                    } else {
+                        remotePeerId = (String) msg.payload().get("peerId");
+                    }
                 }
-                handleMessage(ctx.channel(), remotePeerId, msg);
+                if (remotePeerId != null) {
+                    handleMessage(ctx.channel(), remotePeerId, msg);
+                }
             }
         }
         
@@ -656,13 +672,14 @@ public class BlobNetwork {
                 Message msg = decodeMessage(textFrame.text());
                 if ("hello".equals(msg.type())) {
                     remotePeerId = (String) msg.payload().get("peerId");
+                    InetSocketAddress addr = (InetSocketAddress) ctx.channel().remoteAddress();
                     PeerConnection peer = new PeerConnection(remotePeerId, ctx.channel(), 
-                        System.currentTimeMillis(), TransportType.CLEARNET, address);
+                        System.currentTimeMillis(), TransportType.CLEARNET, address,
+                        addr.getHostString(), addr.getPort());
                     peers.put(remotePeerId, peer);
                     connectionFuture.complete(peer);
                     
                     if (onPeer != null) {
-                        InetSocketAddress addr = (InetSocketAddress) ctx.channel().remoteAddress();
                         onPeer.accept(new PeerConnectedEvent(remotePeerId, addr.getHostString(), 
                             addr.getPort(), TransportType.CLEARNET));
                     }
@@ -672,7 +689,9 @@ public class BlobNetwork {
                         sendMessage(ctx.channel(), haveMsg);
                     }
                 }
-                handleMessage(ctx.channel(), remotePeerId, msg);
+                if (remotePeerId != null) {
+                    handleMessage(ctx.channel(), remotePeerId, msg);
+                }
             }
         }
         
@@ -806,9 +825,17 @@ public class BlobNetwork {
     public enum PeerHealthState { UNKNOWN, HEALTHY, DEGRADED, UNHEALTHY }
     
     public record PeerConnection(String peerId, Channel channel, long connectedAt, 
-                                  TransportType transportType, String address) {
+                                  TransportType transportType, String address, String host, int port) {
         public PeerConnection(String peerId, Channel channel, long connectedAt) {
-            this(peerId, channel, connectedAt, TransportType.CLEARNET, null);
+            this(peerId, channel, connectedAt, TransportType.CLEARNET, null, null, 0);
+        }
+        
+        public PeerConnection(String peerId, Channel channel, long connectedAt, String host, int port) {
+            this(peerId, channel, connectedAt, TransportType.CLEARNET, null, host, port);
+        }
+
+        public PeerConnection(String peerId, Channel channel, long connectedAt, TransportType type, String address) {
+            this(peerId, channel, connectedAt, type, address, null, 0);
         }
     }
     
@@ -823,7 +850,9 @@ public class BlobNetwork {
         double score
     ) {}
     
-    public record Message(String type, Map<String, Object> payload) {}
+    public record Message(String type, Map<String, Object> payload) {
+        public Message() { this(null, null); }
+    }
     
     public record ListeningEvent(int port) {}
     public record PeerConnectedEvent(String peerId, String host, int port, TransportType transportType) {

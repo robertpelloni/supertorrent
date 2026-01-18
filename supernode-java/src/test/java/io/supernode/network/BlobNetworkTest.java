@@ -88,7 +88,10 @@ class BlobNetworkTest {
         void shouldUseProvidedPeerId() {
             String customPeerId = "custom-peer-id-12345";
             BlobNetwork customNetwork = new BlobNetwork(blobStore, 
-                new BlobNetwork.BlobNetworkOptions(customPeerId, 0, 50));
+                BlobNetwork.BlobNetworkOptions.builder()
+                    .peerId(customPeerId)
+                    .maxConnections(50)
+                    .build());
             
             assertEquals(customPeerId, customNetwork.getPeerId());
             customNetwork.destroy();
@@ -139,7 +142,7 @@ class BlobNetworkTest {
             network.listen(0).get(5, TimeUnit.SECONDS);
             
             BlobNetwork.BlobNetworkStats stats = network.getStats();
-            assertEquals(0, stats.peerCount());
+            assertEquals(0, stats.activePeers());
         }
     }
     
@@ -179,7 +182,7 @@ class BlobNetworkTest {
             assertNotNull(stats);
             assertEquals(network.getPeerId(), stats.peerId());
             assertEquals(port, stats.port());
-            assertEquals(0, stats.peerCount());
+            assertEquals(0, stats.activePeers());
             assertEquals(1, stats.announcedBlobs());
         }
     }

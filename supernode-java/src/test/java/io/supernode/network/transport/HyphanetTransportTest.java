@@ -71,7 +71,10 @@ class HyphanetTransportTest {
         @DisplayName("should parse CHK address")
         void shouldParseChkAddress() {
             HyphanetTransport transport = new HyphanetTransport();
-            TransportAddress addr = transport.parseAddress("CHK@abc123xyz");
+            
+            // Valid CHK addresses require comma-separated components (e.g., CHK@key1,key2,key3)
+            String validChk = "CHK@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,aabbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb,cccccccccccccccccccccccccccccccccc,dddddddddddddddddddddddddddddddddd,eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee,ffffffffffffffffffffffffffffffffffffffff";
+            TransportAddress addr = transport.parseAddress(validChk);
             
             assertNotNull(addr);
             assertEquals(TransportType.HYPHANET, addr.type());

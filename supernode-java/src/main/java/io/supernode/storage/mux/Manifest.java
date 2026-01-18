@@ -17,8 +17,8 @@ import java.util.List;
 public class Manifest {
     public static final int VERSION = 1;
     private static final int NONCE_SIZE = 12;
-    private static final int TAG_SIZE = 16;
-    private static final String CIPHER_ALGO = "ChaCha20-Poly1305";
+    private static final String CIPHER_ALGO = "AES/GCM/NoPadding";
+    private static final int GCM_TAG_SIZE = 128;
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @JsonProperty("version")
@@ -78,8 +78,8 @@ public class Manifest {
 
             Cipher cipher = Cipher.getInstance(CIPHER_ALGO);
             cipher.init(Cipher.ENCRYPT_MODE,
-                new SecretKeySpec(key, "ChaCha20"),
-                new GCMParameterSpec(TAG_SIZE * 8, nonce));
+                new SecretKeySpec(key, "AES"),
+                new GCMParameterSpec(GCM_TAG_SIZE, nonce));
 
             byte[] ciphertext = cipher.doFinal(json);
 
@@ -102,8 +102,8 @@ public class Manifest {
 
             Cipher cipher = Cipher.getInstance(CIPHER_ALGO);
             cipher.init(Cipher.DECRYPT_MODE,
-                new SecretKeySpec(key, "ChaCha20"),
-                new GCMParameterSpec(TAG_SIZE * 8, nonce));
+                new SecretKeySpec(key, "AES"),
+                new GCMParameterSpec(GCM_TAG_SIZE, nonce));
 
             byte[] json = cipher.doFinal(ciphertext);
             return MAPPER.readValue(json, Manifest.class);

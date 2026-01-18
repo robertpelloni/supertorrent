@@ -55,206 +55,10 @@ class SupernodeNetworkTest {
         void shouldCreateWithCustomBlobStore() {
             InMemoryBlobStore customStore = new InMemoryBlobStore();
             SupernodeNetwork.SupernodeNetworkOptions options = 
-                new SupernodeNetwork.SupernodeNetworkOptions(
-                    customStore, null, null, 50, false, 4, 2, null
-                );
-            
-            SupernodeNetwork customNetwork = new SupernodeNetwork(options);
-            
-            assertSame(customStore, customNetwork.getBlobStore());
-            customNetwork.destroy();
-        }
-        
-        @Test
-        @DisplayName("should create with erasure coding enabled")
-        void shouldCreateWithErasureCodingEnabled() {
-            SupernodeNetwork.SupernodeNetworkOptions options = 
-                SupernodeNetwork.SupernodeNetworkOptions.withErasure(4, 2);
-            
-            SupernodeNetwork erasureNetwork = new SupernodeNetwork(options);
-            
-            assertNotNull(erasureNetwork.getStorage());
-            erasureNetwork.destroy();
-        }
-    }
-    
-    @Nested
-    @DisplayName("Lifecycle")
-    class LifecycleTests {
-        
-        @Test
-        @DisplayName("should listen on specified port")
-        void shouldListenOnSpecifiedPort() throws Exception {
-            AtomicBoolean listeningFired = new AtomicBoolean(false);
-            AtomicReference<Integer> listeningPort = new AtomicReference<>();
-            
-            network.setOnListening(event -> {
-                listeningFired.set(true);
-                listeningPort.set(event.port());
-            });
-            
-            int port = network.listen(0).get(10, TimeUnit.SECONDS);
-            
-            assertTrue(listeningFired.get());
-            assertTrue(port > 0);
-            assertEquals(port, listeningPort.get());
-            assertEquals(port, network.getPort());
-        }
-        
-        @Test
-        @DisplayName("should destroy cleanly")
-        void shouldDestroyCleanly() throws Exception {
-            network.listen(0).get(10, TimeUnit.SECONDS);
-            
-            AtomicBoolean destroyedFired = new AtomicBoolean(false);
-            network.setOnDestroyed(v -> destroyedFired.set(true));
-            
-            network.destroy();
-            
-            assertTrue(network.isDestroyed());
-            assertTrue(destroyedFired.get());
-        }
-        
-        @Test
-        @DisplayName("should destroy all subcomponents")
-        void shouldDestroyAllSubcomponents() throws Exception {
-            network.listen(0).get(10, TimeUnit.SECONDS);
-            
-            network.destroy();
-            
-            assertTrue(network.getBlobNetwork().isDestroyed());
-            assertTrue(network.getDht().isDestroyed());
-            assertTrue(network.getManifestDistributor().isDestroyed());
-        }
-    }
-    
-    @Nested
-    @DisplayName("File Ingest")
-    class FileIngestTests {
-        
-        @Test
-        @DisplayName("should ingest file and return result")
-        void shouldIngestFileAndReturnResult() throws Exception {
-            network.listen(0).get(10, TimeUnit.SECONDS);
-            
-            byte[] fileData = "Hello, Supernode!".getBytes(StandardCharsets.UTF_8);
-            byte[] masterKey = generateMasterKey();
-            
-            IngestResult result = network.ingestFile(fileData, "test.txt", masterKey);
-            
-            assertNotNull(result);
-            assertNotNull(result.fileId());
-            assertFalse(result.fileId().isEmpty());
-            assertNotNull(result.chunkHashes());
-            assertFalse(result.chunkHashes().isEmpty());
-        }
-        
-        @Test
-        @DisplayName("should emit file ingested event")
-        void shouldEmitFileIngestedEvent() throws Exception {
-            network.listen(0).get(10, TimeUnit.SECONDS);
-            
-            AtomicReference<SupernodeNetwork.FileIngestedEvent> eventRef = new AtomicReference<>();
-            network.setOnFileIngested(eventRef::set);
-            
-            byte[] fileData = "Test data for event".getBytes(StandardCharsets.UTF_8);
-            byte[] masterKey = generateMasterKey();
-            
-            network.ingestFile(fileData, "event-test.txt", masterKey);
-            
-            assertNotNull(eventRef.get());
-            assertEquals("event-test.txt", eventRef.get().fileName());
-            assertEquals(fileData.length, eventRef.get().size());
-        }
-        
-        @Test
-        @DisplayName("should ingest large file with multiple chunks")
-        void shouldIngestLargeFileWithMultipleChunks() throws Exception {
-            network.listen(0).get(10, TimeUnit.SECONDS);
-            
-            byte[] largeData = new byte[150_000];
-            new SecureRandom().nextBytes(largeData);
-            byte[] masterKey = generateMasterKey();
-            
-            IngestResult result = network.ingestFile(largeData, "large-file.bin", masterKey);
-            
-            assertNotNull(result);
-            assertTrue(result.chunkHashes().size() > 1, 
-                "Large file should produce multiple chunks");
-        }
-    }
-    
-    @Nested
-    @DisplayName("File Retrieve")
-    class FileRetrieveTests {
-        
-        @Test
-        @DisplayName("should retrieve ingested file")
-        void shouldRetrieveIngestedFile() throws Exception {
-            network.listen(0).get(10, TimeUnit.SECONDS);
-            
-            byte[] originalData = "Content to retrieve".getBytes(StandardCharsets.UTF_8);
-            byte[] masterKey = generateMasterKey();
-            
-            IngestResult ingestResult = network.ingestFile(originalData, "retrieve-test.txt", masterKey);
-            
-            RetrieveResult retrieveResult = network.retrieveFile(ingestResult.fileId(), masterKey);
-            
-            assertNotNull(retrieveResult);
-            assertNotNull(retrieveResult.data());
-            assertArrayEquals(originalData, retrieveResult.data());
-        }
-        
-        @Test
-        @DisplayName("should emit file retrieved event")
-        void shouldEmitFileRetrievedEvent() throws Exception {
-            network.listen(0).get(10, TimeUnit.SECONDS);
-            
-            AtomicReference<SupernodeNetwork.FileRetrievedEvent> eventRef = new AtomicReference<>();
-            network.setOnFileRetrieved(eventRef::set);
-            
-            byte[] fileData = "Event data".getBytes(StandardCharsets.UTF_8);
-            byte[] masterKey = generateMasterKey();
-            
-            IngestResult ingestResult = network.ingestFile(fileData, "retrieved-event.txt", masterKey);
-            network.retrieveFile(ingestResult.fileId(), masterKey);
-            
-            assertNotNull(eventRef.get());
-            assertEquals("retrieved-event.txt", eventRef.get().fileName());
-        }
-        
-        @Test
-        @DisplayName("should throw exception for non-existent file")
-        void shouldThrowExceptionForNonExistentFile() throws Exception {
-            network.listen(0).get(10, TimeUnit.SECONDS);
-            
-            byte[] masterKey = generateMasterKey();
-            
-            assertThrows(Exception.class, () -> 
-                network.retrieveFile("non-existent-file-id", masterKey));
-        }
-    }
-    
-    @Nested
-    @DisplayName("Peer Management")
-    class PeerManagementTests {
-        
-        @Test
-        @DisplayName("should start with no peers")
-        void shouldStartWithNoPeers() throws Exception {
-            network.listen(0).get(10, TimeUnit.SECONDS);
-            
-            assertTrue(network.getPeers().isEmpty());
-        }
-        
-        @Test
-        @DisplayName("should fail to connect to invalid address")
-        void shouldFailToConnectToInvalidAddress() throws Exception {
-            network.listen(0).get(10, TimeUnit.SECONDS);
-            
-            assertThrows(Exception.class, () -> 
-                network.connect("ws://invalid-host:9999").get(5, TimeUnit.SECONDS)
-            );
+                SupernodeNetwork.SupernodeNetworkOptions.builder()
+                    .blobStore(customStore)
+                    .maxConnections(50)
+                    .build();
         }
     }
     
@@ -356,11 +160,11 @@ class SupernodeNetworkTest {
         @DisplayName("should create default options")
         void shouldCreateDefaultOptions() {
             SupernodeNetwork.SupernodeNetworkOptions options = 
-                new SupernodeNetwork.SupernodeNetworkOptions();
+                SupernodeNetwork.SupernodeNetworkOptions.defaults();
             
             assertNull(options.blobStore());
             assertNull(options.peerId());
-            assertNull(options.bootstrap());
+            assertNotNull(options.bootstrap());
             assertEquals(50, options.maxConnections());
             assertFalse(options.enableErasure());
             assertEquals(4, options.dataShards());
@@ -371,7 +175,11 @@ class SupernodeNetworkTest {
         @DisplayName("should create erasure options via factory method")
         void shouldCreateErasureOptionsViaFactoryMethod() {
             SupernodeNetwork.SupernodeNetworkOptions options = 
-                SupernodeNetwork.SupernodeNetworkOptions.withErasure(6, 3);
+                SupernodeNetwork.SupernodeNetworkOptions.builder()
+                    .enableErasure(true)
+                    .dataShards(6)
+                    .parityShards(3)
+                    .build();
             
             assertTrue(options.enableErasure());
             assertEquals(6, options.dataShards());

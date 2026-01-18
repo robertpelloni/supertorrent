@@ -603,6 +603,32 @@ public class TransportManager {
         }
     }
 
+    public Transport.HealthStatus getHealthStatus() {
+        Transport.HealthState worstState = Transport.HealthState.HEALTHY;
+        long totalErrors = 0;
+        long maxLatency = 0;
+        StringBuilder msg = new StringBuilder();
+        
+        for (Map.Entry<TransportType, TransportHealth> entry : transportHealth.entrySet()) {
+            TransportHealth h = entry.getValue();
+            if (h.state.ordinal() > worstState.ordinal()) {
+                worstState = h.state;
+            }
+            totalErrors += h.consecutiveFailures;
+            maxLatency = Math.max(maxLatency, h.latencyMs);
+            if (msg.length() > 0) msg.append(" | ");
+            msg.append(entry.getKey()).append(": ").append(h.state);
+        }
+        
+        return new Transport.HealthStatus(
+            worstState,
+            msg.length() > 0 ? msg.toString() : "No transports active",
+            Instant.now(),
+            totalErrors,
+            maxLatency
+        );
+    }
+
     public AggregateStats getStats() {
         long connectionsIn = 0, connectionsOut = 0;
         long bytesReceived = 0, bytesSent = 0;

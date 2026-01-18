@@ -90,9 +90,9 @@ class DHTDiscoveryTest {
             byte[] customId = new byte[20];
             Arrays.fill(customId, (byte) 0x42);
             
-            DHTDiscovery customDht = new DHTDiscovery(new DHTDiscovery.DHTOptions(
-                customId, null, 0, 0
-            ));
+            DHTDiscovery customDht = new DHTDiscovery(DHTDiscovery.DHTOptions.builder()
+                .nodeId(customId)
+                .build());
             
             assertArrayEquals(customId, customDht.getNodeId());
             customDht.destroy();
@@ -239,9 +239,9 @@ class DHTDiscoveryTest {
         void shouldAcceptCustomBootstrap() {
             List<String> customBootstrap = List.of("custom.node:6881");
             
-            DHTDiscovery customDht = new DHTDiscovery(new DHTDiscovery.DHTOptions(
-                null, customBootstrap, 0, 0
-            ));
+            DHTDiscovery customDht = new DHTDiscovery(DHTDiscovery.DHTOptions.builder()
+                .bootstrap(customBootstrap)
+                .build());
             
             customDht.destroy();
         }

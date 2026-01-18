@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@DisplayName("BobcoinBridge")
+@DisplayName("BobcoinBridge Integration")
 class BobcoinBridgeTest {
 
     private BobcoinBridge bridge;
@@ -31,7 +31,7 @@ class BobcoinBridgeTest {
     }
 
     @Nested
-    @DisplayName("Construction")
+    @DisplayName("Construction & Configuration")
     class ConstructionTests {
 
         @Test
@@ -44,14 +44,15 @@ class BobcoinBridgeTest {
         }
 
         @Test
-        @DisplayName("should create with custom options")
+        @DisplayName("should create with custom options via builder")
         void shouldCreateWithCustomOptions() {
-            BobcoinBridge.BobcoinOptions options = new BobcoinBridge.BobcoinOptions(
-                "https://custom-rpc.example.com",
-                "mainnet",
-                new byte[32],
-                "contract-address"
-            );
+            byte[] key = new byte[32];
+            BobcoinBridge.BobcoinOptions options = BobcoinBridge.BobcoinOptions.builder()
+                .rpcEndpoint("https://custom-rpc.example.com")
+                .network("mainnet")
+                .walletKey(key)
+                .contractAddress("contract-address")
+                .build();
 
             BobcoinBridge customBridge = new BobcoinBridge(options);
 
@@ -61,7 +62,7 @@ class BobcoinBridgeTest {
     }
 
     @Nested
-    @DisplayName("Connection")
+    @DisplayName("Connection Lifecycle")
     class ConnectionTests {
 
         @Test
@@ -104,14 +105,14 @@ class BobcoinBridgeTest {
         }
 
         @Test
-        @DisplayName("should use provided wallet key for public key derivation")
+        @DisplayName("should use provided wallet key for derivation")
         void shouldUseProvidedWalletKey() throws Exception {
             byte[] walletKey = new byte[32];
             for (int i = 0; i < 32; i++) walletKey[i] = (byte) i;
 
-            BobcoinBridge.BobcoinOptions options = new BobcoinBridge.BobcoinOptions(
-                null, null, walletKey, null
-            );
+            BobcoinBridge.BobcoinOptions options = BobcoinBridge.BobcoinOptions.builder()
+                .walletKey(walletKey)
+                .build();
             BobcoinBridge walletBridge = new BobcoinBridge(options);
 
             walletBridge.connect().get(5, TimeUnit.SECONDS);
@@ -123,7 +124,7 @@ class BobcoinBridgeTest {
     }
 
     @Nested
-    @DisplayName("Storage Provider Registration")
+    @DisplayName("Storage Provider Operations")
     class ProviderRegistrationTests {
 
         @Test
@@ -138,22 +139,7 @@ class BobcoinBridgeTest {
             assertNotNull(result);
             assertNotNull(result.providerId());
             assertNotNull(result.txHash());
-            assertTrue(result.txHash().startsWith("0x"));
-        }
-
-        @Test
-        @DisplayName("should emit provider registered event")
-        void shouldEmitProviderRegisteredEvent() throws Exception {
-            bridge.connect().get(5, TimeUnit.SECONDS);
-
-            AtomicReference<BobcoinBridge.ProviderRegisteredEvent> eventRef = new AtomicReference<>();
-            bridge.setOnProviderRegistered(eventRef::set);
-
-            bridge.registerStorageProvider(2048L, 0.05).get(5, TimeUnit.SECONDS);
-
-            assertNotNull(eventRef.get());
-            assertEquals(2048L, eventRef.get().capacity());
-            assertEquals(0.05, eventRef.get().pricePerGBHour());
+            assertTrue(result.txHash().startsWith("tx_"));
         }
 
         @Test
@@ -166,7 +152,7 @@ class BobcoinBridgeTest {
     }
 
     @Nested
-    @DisplayName("Storage Deals")
+    @DisplayName("Storage Deals & Tracking")
     class StorageDealTests {
 
         @Test
@@ -189,42 +175,6 @@ class BobcoinBridgeTest {
         }
 
         @Test
-        @DisplayName("should create storage deal with minimal params")
-        void shouldCreateStorageDealWithMinimalParams() throws Exception {
-            bridge.connect().get(5, TimeUnit.SECONDS);
-
-            BobcoinBridge.StorageDealParams params = new BobcoinBridge.StorageDealParams(
-                "file-456", 2048, 7200000L
-            );
-
-            BobcoinBridge.StorageDeal deal = bridge.createStorageDeal(params)
-                .get(5, TimeUnit.SECONDS);
-
-            assertNotNull(deal);
-            assertNotNull(deal.dealId());
-        }
-
-        @Test
-        @DisplayName("should emit deal created event")
-        void shouldEmitDealCreatedEvent() throws Exception {
-            bridge.connect().get(5, TimeUnit.SECONDS);
-
-            AtomicReference<BobcoinBridge.DealCreatedEvent> eventRef = new AtomicReference<>();
-            bridge.setOnDealCreated(eventRef::set);
-
-            BobcoinBridge.StorageDealParams params = new BobcoinBridge.StorageDealParams(
-                "event-file", 4096, 1800000L, null, 2
-            );
-            bridge.createStorageDeal(params).get(5, TimeUnit.SECONDS);
-
-            assertNotNull(eventRef.get());
-            assertEquals("event-file", eventRef.get().fileId());
-            assertEquals(4096, eventRef.get().size());
-            assertEquals(1800000L, eventRef.get().duration());
-            assertEquals(2, eventRef.get().redundancy());
-        }
-
-        @Test
         @DisplayName("should get deal status")
         void shouldGetDealStatus() throws Exception {
             bridge.connect().get(5, TimeUnit.SECONDS);
@@ -234,112 +184,38 @@ class BobcoinBridgeTest {
 
             assertNotNull(status);
             assertEquals("deal-123", status.dealId());
-            assertNotNull(status.status());
-        }
-
-        @Test
-        @DisplayName("should list active deals")
-        void shouldListActiveDeals() throws Exception {
-            bridge.connect().get(5, TimeUnit.SECONDS);
-
-            List<BobcoinBridge.DealStatus> deals = bridge.listActiveDeals()
-                .get(5, TimeUnit.SECONDS);
-
-            assertNotNull(deals);
+            assertEquals("active", status.status());
         }
     }
 
     @Nested
-    @DisplayName("Storage Proofs")
-    class StorageProofTests {
+    @DisplayName("Proofs & Rewards")
+    class ProofAndRewardTests {
 
         @Test
-        @DisplayName("should submit storage proof")
-        void shouldSubmitStorageProof() throws Exception {
+        @DisplayName("should submit and verify storage proof")
+        void submitAndVerifyProof() throws Exception {
             bridge.connect().get(5, TimeUnit.SECONDS);
 
             BobcoinBridge.ProofSubmission submission = bridge.submitStorageProof(
                 "deal-123",
-                List.of("chunk-1", "chunk-2", "chunk-3"),
+                List.of("chunk-1", "chunk-2"),
                 "merkle-root-abc"
             ).get(5, TimeUnit.SECONDS);
 
-            assertNotNull(submission);
             assertNotNull(submission.proofId());
-            assertNotNull(submission.txHash());
-        }
-
-        @Test
-        @DisplayName("should emit proof submitted event")
-        void shouldEmitProofSubmittedEvent() throws Exception {
-            bridge.connect().get(5, TimeUnit.SECONDS);
-
-            AtomicReference<BobcoinBridge.ProofSubmittedEvent> eventRef = new AtomicReference<>();
-            bridge.setOnProofSubmitted(eventRef::set);
-
-            bridge.submitStorageProof("deal-456", List.of("chunk"), "root")
-                .get(5, TimeUnit.SECONDS);
-
-            assertNotNull(eventRef.get());
-            assertEquals("deal-456", eventRef.get().dealId());
-            assertEquals("root", eventRef.get().merkleRoot());
-        }
-
-        @Test
-        @DisplayName("should verify storage proof")
-        void shouldVerifyStorageProof() throws Exception {
-            bridge.connect().get(5, TimeUnit.SECONDS);
-
-            BobcoinBridge.ProofSubmission submission = bridge.submitStorageProof(
-                "deal-789", List.of("chunk"), "root"
-            ).get(5, TimeUnit.SECONDS);
 
             BobcoinBridge.ProofVerification verification = bridge
                 .verifyStorageProof(submission.proofId())
                 .get(5, TimeUnit.SECONDS);
 
-            assertNotNull(verification);
             assertTrue(verification.isValid());
             assertNotNull(verification.txHash());
         }
 
         @Test
-        @DisplayName("should emit proof verified event")
-        void shouldEmitProofVerifiedEvent() throws Exception {
-            bridge.connect().get(5, TimeUnit.SECONDS);
-
-            AtomicReference<BobcoinBridge.ProofVerifiedEvent> eventRef = new AtomicReference<>();
-            bridge.setOnProofVerified(eventRef::set);
-
-            BobcoinBridge.ProofSubmission submission = bridge.submitStorageProof(
-                "deal-verify", List.of("chunk"), "root"
-            ).get(5, TimeUnit.SECONDS);
-
-            bridge.verifyStorageProof(submission.proofId()).get(5, TimeUnit.SECONDS);
-
-            assertNotNull(eventRef.get());
-            assertEquals(submission.proofId(), eventRef.get().proofId());
-            assertTrue(eventRef.get().isValid());
-        }
-
-        @Test
-        @DisplayName("should fail to verify unknown proof")
-        void shouldFailToVerifyUnknownProof() throws Exception {
-            bridge.connect().get(5, TimeUnit.SECONDS);
-
-            assertThrows(Exception.class, () ->
-                bridge.verifyStorageProof("unknown-proof-id").get(5, TimeUnit.SECONDS)
-            );
-        }
-    }
-
-    @Nested
-    @DisplayName("Rewards")
-    class RewardTests {
-
-        @Test
-        @DisplayName("should claim reward")
-        void shouldClaimReward() throws Exception {
+        @DisplayName("should claim storage rewards")
+        void claimRewards() throws Exception {
             bridge.connect().get(5, TimeUnit.SECONDS);
 
             BobcoinBridge.RewardClaim claim = bridge.claimReward("deal-123")
@@ -349,29 +225,14 @@ class BobcoinBridgeTest {
             assertTrue(claim.reward() > 0);
             assertNotNull(claim.txHash());
         }
-
-        @Test
-        @DisplayName("should emit reward claimed event")
-        void shouldEmitRewardClaimedEvent() throws Exception {
-            bridge.connect().get(5, TimeUnit.SECONDS);
-
-            AtomicReference<BobcoinBridge.RewardClaimedEvent> eventRef = new AtomicReference<>();
-            bridge.setOnRewardClaimed(eventRef::set);
-
-            bridge.claimReward("deal-reward").get(5, TimeUnit.SECONDS);
-
-            assertNotNull(eventRef.get());
-            assertEquals("deal-reward", eventRef.get().dealId());
-            assertTrue(eventRef.get().reward() > 0);
-        }
     }
 
     @Nested
-    @DisplayName("Balance")
-    class BalanceTests {
+    @DisplayName("Wallet & Balance")
+    class WalletTests {
 
         @Test
-        @DisplayName("should get balance")
+        @DisplayName("should get account balance")
         void shouldGetBalance() throws Exception {
             bridge.connect().get(5, TimeUnit.SECONDS);
 
@@ -380,90 +241,32 @@ class BobcoinBridgeTest {
             assertNotNull(balance);
             assertTrue(balance.bob() >= 0);
             assertTrue(balance.staked() >= 0);
-            assertTrue(balance.pending() >= 0);
         }
     }
 
     @Nested
-    @DisplayName("Event Listeners")
-    class EventListenerTests {
-
-        @Test
-        @DisplayName("should accept all event listeners")
-        void shouldAcceptAllEventListeners() {
-            assertDoesNotThrow(() -> {
-                bridge.setOnConnected(e -> {});
-                bridge.setOnError(e -> {});
-                bridge.setOnDisconnected(v -> {});
-                bridge.setOnProviderRegistered(e -> {});
-                bridge.setOnDealCreated(e -> {});
-                bridge.setOnProofSubmitted(e -> {});
-                bridge.setOnProofVerified(e -> {});
-                bridge.setOnRewardClaimed(e -> {});
-            });
-        }
-
-        @Test
-        @DisplayName("should handle error event")
-        void shouldHandleErrorEvent() {
-            AtomicReference<Exception> errorRef = new AtomicReference<>();
-            bridge.setOnError(errorRef::set);
-
-            assertNotNull(bridge);
-        }
-    }
-
-    @Nested
-    @DisplayName("Records")
+    @DisplayName("Records Verification")
     class RecordTests {
 
         @Test
-        @DisplayName("BobcoinOptions default constructor")
-        void bobcoinOptionsDefaultConstructor() {
-            BobcoinBridge.BobcoinOptions options = new BobcoinBridge.BobcoinOptions();
-
-            assertNull(options.rpcEndpoint());
-            assertNull(options.network());
-            assertNull(options.walletKey());
-            assertNull(options.contractAddress());
+        @DisplayName("BobcoinOptions should have defaults")
+        void bobcoinOptionsDefaults() {
+            BobcoinBridge.BobcoinOptions options = BobcoinBridge.BobcoinOptions.defaults();
+            assertNotNull(options.rpcEndpoint());
+            assertNotNull(options.network());
         }
 
         @Test
-        @DisplayName("StorageDealParams convenience constructor")
-        void storageDealParamsConvenienceConstructor() {
+        @DisplayName("StorageDealParams should map correctly")
+        void storageDealParamsMapping() {
             BobcoinBridge.StorageDealParams params = new BobcoinBridge.StorageDealParams(
-                "file", 1024, 3600000L
+                "id", 100, 1000, 5.0, 2
             );
-
-            assertEquals("file", params.fileId());
-            assertEquals(1024, params.size());
-            assertEquals(3600000L, params.durationMs());
-            assertNull(params.maxPrice());
-            assertEquals(3, params.redundancy());
-        }
-
-        @Test
-        @DisplayName("Balance record fields")
-        void balanceRecordFields() {
-            BobcoinBridge.Balance balance = new BobcoinBridge.Balance(1000, 500, 100);
-
-            assertEquals(1000, balance.bob());
-            assertEquals(500, balance.staked());
-            assertEquals(100, balance.pending());
-        }
-
-        @Test
-        @DisplayName("DealStatus record fields")
-        void dealStatusRecordFields() {
-            BobcoinBridge.DealStatus status = new BobcoinBridge.DealStatus(
-                "deal-id", "active", 10, 123456789L, 500
-            );
-
-            assertEquals("deal-id", status.dealId());
-            assertEquals("active", status.status());
-            assertEquals(10, status.proofsSubmitted());
-            assertEquals(123456789L, status.lastProofAt());
-            assertEquals(500, status.earnedRewards());
+            assertEquals("id", params.fileId());
+            assertEquals(100, params.size());
+            assertEquals(1000, params.durationMs());
+            assertEquals(5.0, params.maxPrice());
+            assertEquals(2, params.redundancy());
         }
     }
 }

@@ -92,8 +92,9 @@ public class SupernodeStorage {
             int offset = 0;
             int chunkIndex = 0;
             int totalChunks = (int) Math.ceil((double) fileBuffer.length / CHUNK_SIZE);
+            if (fileBuffer.length == 0) totalChunks = 1;
             
-            while (offset < fileBuffer.length) {
+            do {
                 if (state.cancelled) {
                     throw new CancellationException("Operation cancelled: " + operationId);
                 }
@@ -133,7 +134,7 @@ public class SupernodeStorage {
                 chunkIndex++;
                 
                 state.bytesProcessed = offset;
-                state.progress = (double) offset / fileBuffer.length;
+                state.progress = fileBuffer.length > 0 ? (double) offset / fileBuffer.length : 1.0;
                 
                 if (progress != null) {
                     progress.accept(new Progress(
@@ -152,7 +153,7 @@ public class SupernodeStorage {
                     String hash = segment.chunkHash() != null ? segment.chunkHash() : segment.shards().get(0).hash();
                     onChunkIngested.accept(new ChunkIngestedEvent(fileId, hash, state.progress));
                 }
-            }
+            } while (offset < fileBuffer.length);
             
             Manifest manifest = Manifest.create(new Manifest.ManifestOptions(
                 fileId,

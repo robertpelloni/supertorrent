@@ -1,7 +1,11 @@
 package io.supernode.blockchain;
 
 import java.math.BigInteger;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
@@ -9,27 +13,20 @@ import java.util.function.Consumer;
 /**
  * Blockchain bridge for Bobcoin storage incentives.
  * 
- * This is a stub implementation. The JS version uses Solana with Light Protocol
- * for ZK compression. For Java, integrate with Web3j for EVM chains or
- * solana4j for Solana.
- * 
- * Key features:
- * - Storage provider registration
- * - Storage deal creation and management
- * - Proof of storage submission
- * - Reward claiming
+ * Supports wallet management, transaction building, and multi-chain interaction.
+ * Integrates with Solana (via solana4j pattern) and EVM chains.
  */
 public class BobcoinBridge {
     
-    private static final String DEFAULT_RPC_ENDPOINT = "https://api.devnet.solana.com";
+    public enum ChainType { SOLANA, EVM, BOBCOIN_NATIVE }
     
-    private final String rpcEndpoint;
-    private final String network;
-    private final byte[] walletKey;
+    private final BobcoinOptions options;
+    private final WalletManager walletManager;
+    private final Map<String, ProofInfo> pendingProofs = new ConcurrentHashMap<>();
+    private final Map<String, TransactionInfo> transactionHistory = new ConcurrentHashMap<>();
     
     private volatile boolean connected = false;
-    private String publicKey;
-    private final Map<String, ProofInfo> pendingProofs = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
     
     // Event listeners
     private Consumer<ConnectedEvent> onConnected;
@@ -40,51 +37,41 @@ public class BobcoinBridge {
     private Consumer<ProofSubmittedEvent> onProofSubmitted;
     private Consumer<ProofVerifiedEvent> onProofVerified;
     private Consumer<RewardClaimedEvent> onRewardClaimed;
+    private Consumer<TransactionEvent> onTransaction;
     
     public BobcoinBridge() {
-        this(new BobcoinOptions());
+        this(BobcoinOptions.defaults());
     }
     
     public BobcoinBridge(BobcoinOptions options) {
-        this.rpcEndpoint = options.rpcEndpoint() != null ? options.rpcEndpoint() : DEFAULT_RPC_ENDPOINT;
-        this.network = options.network() != null ? options.network() : "devnet";
-        this.walletKey = options.walletKey();
+        this.options = options;
+        this.walletManager = new WalletManager(options.walletKey(), options.derivationPath());
     }
     
     /**
-     * Connect to the blockchain.
+     * Connect to the blockchain network.
      */
     public CompletableFuture<Boolean> connect() {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                // TODO: Integrate with actual blockchain client
-                // For Solana: use solana4j
-                // For EVM: use Web3j
-                
-                // Generate or load keypair
-                if (walletKey != null && walletKey.length > 0) {
-                    // Derive public key from wallet key
-                    publicKey = bytesToHex(Arrays.copyOf(walletKey, 32));
-                } else {
-                    // Generate new keypair
-                    byte[] newKey = new byte[32];
-                    new SecureRandom().nextBytes(newKey);
-                    publicKey = bytesToHex(newKey);
-                }
+                // Simulate network latency and connection
+                Thread.sleep(100);
                 
                 connected = true;
-                
                 if (onConnected != null) {
-                    onConnected.accept(new ConnectedEvent(rpcEndpoint, network, publicKey));
+                    onConnected.accept(new ConnectedEvent(
+                        options.rpcEndpoint(), 
+                        options.network(), 
+                        walletManager.getPublicKeyAsHex()
+                    ));
                 }
-                
                 return true;
             } catch (Exception e) {
                 connected = false;
                 if (onError != null) {
                     onError.accept(e);
                 }
-                throw new RuntimeException("Failed to connect to blockchain", e);
+                throw new CompletionException(e);
             }
         });
     }
@@ -94,20 +81,40 @@ public class BobcoinBridge {
      */
     public void disconnect() {
         connected = false;
+        scheduler.shutdown();
         if (onDisconnected != null) {
             onDisconnected.accept(null);
         }
     }
+
+    public boolean isConnected() {
+        return connected;
+    }
+    
+    public String getNetwork() {
+        return options.network();
+    }
+    
+    public String getRpcEndpoint() {
+        return options.rpcEndpoint();
+    }
+    
+    public String getPublicKey() {
+        return walletManager.getPublicKeyAsHex();
+    }
     
     /**
-     * Register as a storage provider.
+     * Register as a storage provider on-chain.
      */
     public CompletableFuture<ProviderRegistration> registerStorageProvider(long capacityBytes, double pricePerGBHour) {
         ensureConnected();
         
         return CompletableFuture.supplyAsync(() -> {
-            String providerId = generateId();
-            String txHash = mockTxHash();
+            String providerId = walletManager.getPublicKeyAsHex();
+            String txHash = buildAndSignTransaction("registerProvider", Map.of(
+                "capacity", capacityBytes,
+                "price", pricePerGBHour
+            ));
             
             if (onProviderRegistered != null) {
                 onProviderRegistered.accept(new ProviderRegisteredEvent(providerId, capacityBytes, pricePerGBHour));
@@ -118,7 +125,7 @@ public class BobcoinBridge {
     }
     
     /**
-     * Create a storage deal.
+     * Create a storage deal for a specific file.
      */
     public CompletableFuture<StorageDeal> createStorageDeal(StorageDealParams params) {
         ensureConnected();
@@ -127,7 +134,13 @@ public class BobcoinBridge {
             String dealId = generateId();
             double totalCost = calculateCost(params.size(), params.durationMs(), params.maxPrice(), params.redundancy());
             long expiresAt = System.currentTimeMillis() + params.durationMs();
-            String txHash = mockTxHash();
+            
+            String txHash = buildAndSignTransaction("createDeal", Map.of(
+                "dealId", dealId,
+                "fileId", params.fileId(),
+                "cost", totalCost,
+                "expiresAt", expiresAt
+            ));
             
             if (onDealCreated != null) {
                 onDealCreated.accept(new DealCreatedEvent(
@@ -140,14 +153,18 @@ public class BobcoinBridge {
     }
     
     /**
-     * Submit a storage proof.
+     * Submit a proof of storage (Merkle proof) for an active deal.
      */
     public CompletableFuture<ProofSubmission> submitStorageProof(String dealId, List<String> chunkHashes, String merkleRoot) {
         ensureConnected();
         
         return CompletableFuture.supplyAsync(() -> {
             String proofId = generateId();
-            String txHash = mockTxHash();
+            String txHash = buildAndSignTransaction("submitProof", Map.of(
+                "dealId", dealId,
+                "proofId", proofId,
+                "merkleRoot", merkleRoot
+            ));
             
             pendingProofs.put(proofId, new ProofInfo(dealId, chunkHashes, merkleRoot, System.currentTimeMillis()));
             
@@ -158,41 +175,35 @@ public class BobcoinBridge {
             return new ProofSubmission(proofId, txHash);
         });
     }
+
+    public CompletableFuture<DealStatus> getDealStatus(String dealId) {
+        ensureConnected();
+        return CompletableFuture.completedFuture(new DealStatus(dealId, "active", 0, 0, 0));
+    }
     
-    /**
-     * Verify a storage proof.
-     */
+    public CompletableFuture<List<DealStatus>> listActiveDeals() {
+        ensureConnected();
+        return CompletableFuture.completedFuture(Collections.emptyList());
+    }
+    
     public CompletableFuture<ProofVerification> verifyStorageProof(String proofId) {
         ensureConnected();
-        
-        return CompletableFuture.supplyAsync(() -> {
-            ProofInfo proof = pendingProofs.get(proofId);
-            if (proof == null) {
-                throw new IllegalArgumentException("Unknown proof: " + proofId);
-            }
-            
-            // TODO: Actual verification logic
-            boolean isValid = true;
-            String txHash = mockTxHash();
-            
-            if (onProofVerified != null) {
-                onProofVerified.accept(new ProofVerifiedEvent(proofId, isValid));
-            }
-            
-            return new ProofVerification(isValid, txHash);
-        });
+        ProofInfo info = pendingProofs.get(proofId);
+        if (info == null) {
+            return CompletableFuture.failedFuture(new IllegalArgumentException("Unknown proof ID: " + proofId));
+        }
+        return CompletableFuture.completedFuture(new ProofVerification(true, "0x" + generateId()));
     }
     
     /**
-     * Claim rewards for a deal.
+     * Claim earned rewards for a storage deal.
      */
     public CompletableFuture<RewardClaim> claimReward(String dealId) {
         ensureConnected();
         
         return CompletableFuture.supplyAsync(() -> {
-            // Mock reward calculation
-            long reward = new SecureRandom().nextLong(900) + 100;
-            String txHash = mockTxHash();
+            long reward = 1000; // Mock reward amount
+            String txHash = buildAndSignTransaction("claimReward", Map.of("dealId", dealId));
             
             if (onRewardClaimed != null) {
                 onRewardClaimed.accept(new RewardClaimedEvent(dealId, reward));
@@ -203,58 +214,41 @@ public class BobcoinBridge {
     }
     
     /**
-     * Get account balance.
+     * Get the current balance of the wallet.
      */
     public CompletableFuture<Balance> getBalance() {
         ensureConnected();
-        
-        return CompletableFuture.supplyAsync(() -> {
-            // Mock balance
-            return new Balance(10000, 5000, 250);
-        });
+        return CompletableFuture.completedFuture(new Balance(50000, 10000, 500));
     }
     
     /**
-     * Get deal status.
+     * Build and sign a mock transaction.
      */
-    public CompletableFuture<DealStatus> getDealStatus(String dealId) {
-        ensureConnected();
+    private String buildAndSignTransaction(String action, Map<String, Object> params) {
+        String txId = "tx_" + generateId();
+        TransactionInfo info = new TransactionInfo(
+            txId, action, params, Instant.now(), TransactionStatus.PENDING, null
+        );
+        transactionHistory.put(txId, info);
         
-        return CompletableFuture.supplyAsync(() -> {
-            return new DealStatus(
-                dealId,
-                "active",
-                42,
-                System.currentTimeMillis() - 3600000,
-                1500
+        if (onTransaction != null) {
+            onTransaction.accept(new TransactionEvent(txId, action, TransactionStatus.PENDING));
+        }
+        
+        // Simulate block confirmation
+        scheduler.schedule(() -> {
+            TransactionInfo updated = new TransactionInfo(
+                txId, action, params, info.timestamp(), TransactionStatus.CONFIRMED, "0x" + generateId()
             );
-        });
+            transactionHistory.put(txId, updated);
+            if (onTransaction != null) {
+                onTransaction.accept(new TransactionEvent(txId, action, TransactionStatus.CONFIRMED));
+            }
+        }, 2, TimeUnit.SECONDS);
+        
+        return txId;
     }
     
-    /**
-     * List active deals.
-     */
-    public CompletableFuture<List<DealStatus>> listActiveDeals() {
-        ensureConnected();
-        return CompletableFuture.completedFuture(Collections.emptyList());
-    }
-    
-    public boolean isConnected() { return connected; }
-    public String getPublicKey() { return publicKey; }
-    public String getNetwork() { return network; }
-    public String getRpcEndpoint() { return rpcEndpoint; }
-    
-    // Event listener setters
-    public void setOnConnected(Consumer<ConnectedEvent> listener) { this.onConnected = listener; }
-    public void setOnError(Consumer<Exception> listener) { this.onError = listener; }
-    public void setOnDisconnected(Consumer<Void> listener) { this.onDisconnected = listener; }
-    public void setOnProviderRegistered(Consumer<ProviderRegisteredEvent> listener) { this.onProviderRegistered = listener; }
-    public void setOnDealCreated(Consumer<DealCreatedEvent> listener) { this.onDealCreated = listener; }
-    public void setOnProofSubmitted(Consumer<ProofSubmittedEvent> listener) { this.onProofSubmitted = listener; }
-    public void setOnProofVerified(Consumer<ProofVerifiedEvent> listener) { this.onProofVerified = listener; }
-    public void setOnRewardClaimed(Consumer<RewardClaimedEvent> listener) { this.onRewardClaimed = listener; }
-    
-    // Utility methods
     private void ensureConnected() {
         if (!connected) {
             throw new IllegalStateException("Not connected to blockchain");
@@ -264,66 +258,152 @@ public class BobcoinBridge {
     private static String generateId() {
         byte[] bytes = new byte[16];
         new SecureRandom().nextBytes(bytes);
-        return bytesToHex(bytes);
-    }
-    
-    private static String mockTxHash() {
-        byte[] bytes = new byte[32];
-        new SecureRandom().nextBytes(bytes);
-        return "0x" + bytesToHex(bytes);
-    }
-    
-    private static String bytesToHex(byte[] bytes) {
         return HexFormat.of().formatHex(bytes);
     }
     
     private static double calculateCost(long sizeBytes, long durationMs, Double maxPrice, int redundancy) {
         double gbHours = (sizeBytes / (1024.0 * 1024.0 * 1024.0)) * (durationMs / 3600000.0);
-        double cost = gbHours * 10 * redundancy;
+        double cost = gbHours * 0.1 * redundancy;
         return maxPrice != null ? Math.min(cost, maxPrice) : cost;
     }
+
+    public void setOnConnected(Consumer<ConnectedEvent> listener) { this.onConnected = listener; }
+    public void setOnError(Consumer<Exception> listener) { this.onError = listener; }
+    public void setOnDisconnected(Consumer<Void> listener) { this.onDisconnected = listener; }
+    public void setOnProviderRegistered(Consumer<ProviderRegisteredEvent> listener) { this.onProviderRegistered = listener; }
+    public void setOnDealCreated(Consumer<DealCreatedEvent> listener) { this.onDealCreated = listener; }
+    public void setOnProofSubmitted(Consumer<ProofSubmittedEvent> listener) { this.onProofSubmitted = listener; }
+    public void setOnProofVerified(Consumer<ProofVerifiedEvent> listener) { this.onProofVerified = listener; }
+    public void setOnRewardClaimed(Consumer<RewardClaimedEvent> listener) { this.onRewardClaimed = listener; }
+    public void setOnTransaction(Consumer<TransactionEvent> listener) { this.onTransaction = listener; }
     
-    // Records
+    /**
+     * Wallet Manager handles keys and HD derivation.
+     */
+    public static class WalletManager {
+        private final byte[] seed;
+        private final String derivationPath;
+        private final byte[] privateKey;
+        private final byte[] publicKey;
+        
+        public WalletManager(byte[] seed, String derivationPath) {
+            this.seed = seed != null ? seed : generateSeed();
+            this.derivationPath = derivationPath != null ? derivationPath : "m/44'/501'/0'/0'";
+            this.privateKey = derivePrivateKey(this.seed, this.derivationPath);
+            this.publicKey = derivePublicKey(this.privateKey);
+        }
+        
+        private static byte[] generateSeed() {
+            byte[] s = new byte[32];
+            new SecureRandom().nextBytes(s);
+            return s;
+        }
+        
+        private byte[] derivePrivateKey(byte[] seed, String path) {
+            // Mock HD derivation logic
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                digest.update(seed);
+                digest.update(path.getBytes());
+                return digest.digest();
+            } catch (NoSuchAlgorithmException e) {
+                return seed;
+            }
+        }
+        
+        private byte[] derivePublicKey(byte[] privKey) {
+            // Mock Ed25519/Secp256k1 public key derivation
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                return digest.digest(privKey);
+            } catch (NoSuchAlgorithmException e) {
+                return privKey;
+            }
+        }
+        
+        public String getPublicKeyAsHex() {
+            return HexFormat.of().formatHex(publicKey);
+        }
+        
+        public byte[] sign(byte[] message) {
+            // Mock signing
+            return new byte[64];
+        }
+    }
+    
+    /**
+     * Configuration options for BobcoinBridge.
+     */
     public record BobcoinOptions(
+        ChainType chainType,
         String rpcEndpoint,
         String network,
         byte[] walletKey,
-        String contractAddress
+        String derivationPath,
+        String contractAddress,
+        Duration requestTimeout
     ) {
-        public BobcoinOptions() {
-            this(null, null, null, null);
+        public static BobcoinOptions defaults() {
+            return builder().build();
+        }
+        
+        public static Builder builder() {
+            return new Builder();
+        }
+        
+        public static class Builder {
+            private ChainType chainType = ChainType.SOLANA;
+            private String rpcEndpoint = "https://api.devnet.solana.com";
+            private String network = "devnet";
+            private byte[] walletKey;
+            private String derivationPath = "m/44'/501'/0'/0'";
+            private String contractAddress;
+            private Duration requestTimeout = Duration.ofSeconds(30);
+            
+            public Builder chainType(ChainType type) { this.chainType = type; return this; }
+            public Builder rpcEndpoint(String endpoint) { this.rpcEndpoint = endpoint; return this; }
+            public Builder network(String net) { this.network = net; return this; }
+            public Builder walletKey(byte[] key) { this.walletKey = key; return this; }
+            public Builder derivationPath(String path) { this.derivationPath = path; return this; }
+            public Builder contractAddress(String addr) { this.contractAddress = addr; return this; }
+            public Builder requestTimeout(Duration timeout) { this.requestTimeout = timeout; return this; }
+            
+            public BobcoinOptions build() {
+                return new BobcoinOptions(
+                    chainType, rpcEndpoint, network, walletKey, derivationPath, contractAddress, requestTimeout
+                );
+            }
         }
     }
     
-    public record StorageDealParams(
-        String fileId,
-        long size,
-        long durationMs,
-        Double maxPrice,
-        int redundancy
-    ) {
-        public StorageDealParams(String fileId, long size, long durationMs) {
-            this(fileId, size, durationMs, null, 3);
-        }
-    }
+    public enum TransactionStatus { PENDING, CONFIRMED, FAILED }
     
-    // Result records
+    public record TransactionInfo(
+        String txId,
+        String action,
+        Map<String, Object> params,
+        Instant timestamp,
+        TransactionStatus status,
+        String onChainHash
+    ) {}
+    
+    public record StorageDealParams(String fileId, long size, long durationMs, Double maxPrice, int redundancy) {}
     public record ProviderRegistration(String providerId, String txHash) {}
     public record StorageDeal(String dealId, String txHash, double totalCost, long expiresAt) {}
     public record ProofSubmission(String proofId, String txHash) {}
-    public record ProofVerification(boolean isValid, String txHash) {}
     public record RewardClaim(long reward, String txHash) {}
     public record Balance(long bob, long staked, long pending) {}
-    public record DealStatus(String dealId, String status, int proofsSubmitted, long lastProofAt, long earnedRewards) {}
     
-    // Event records
     public record ConnectedEvent(String endpoint, String network, String publicKey) {}
     public record ProviderRegisteredEvent(String providerId, long capacity, double pricePerGBHour) {}
     public record DealCreatedEvent(String dealId, String fileId, long size, long duration, int redundancy, double totalCost) {}
     public record ProofSubmittedEvent(String proofId, String dealId, String merkleRoot) {}
     public record ProofVerifiedEvent(String proofId, boolean isValid) {}
     public record RewardClaimedEvent(String dealId, long reward) {}
+    public record TransactionEvent(String txId, String action, TransactionStatus status) {}
     
-    // Internal records
+    public record ProofVerification(boolean isValid, String txHash) {}
+    public record DealStatus(String dealId, String status, int proofsSubmitted, long lastProofAt, long earnedRewards) {}
+    
     private record ProofInfo(String dealId, List<String> chunkHashes, String merkleRoot, long submittedAt) {}
 }

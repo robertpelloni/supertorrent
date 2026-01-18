@@ -20,13 +20,13 @@
 <tr>
 <td>
 <div class="infoBox" id="tests">
-<div class="counter">40</div>
+<div class="counter">1</div>
 <p>tests</p>
 </div>
 </td>
 <td>
 <div class="infoBox" id="failures">
-<div class="counter">0</div>
+<div class="counter">1</div>
 <p>failures</p>
 </div>
 </td>
@@ -38,7 +38,7 @@
 </td>
 <td>
 <div class="infoBox" id="duration">
-<div class="counter">4.019s</div>
+<div class="counter">0.049s</div>
 <p>duration</p>
 </div>
 </td>
@@ -47,8 +47,8 @@
 </div>
 </td>
 <td>
-<div class="infoBox success" id="successRate">
-<div class="percent">100%</div>
+<div class="infoBox failures" id="successRate">
+<div class="percent">0%</div>
 <p>successful</p>
 </div>
 </td>
@@ -58,13 +58,25 @@
 <div id="tabs">
 <ul class="tabLinks">
 <li>
-<a href="#tab0">Packages</a>
+<a href="#tab0">Failed tests</a>
 </li>
 <li>
-<a href="#tab1">Classes</a>
+<a href="#tab1">Packages</a>
+</li>
+<li>
+<a href="#tab2">Classes</a>
 </li>
 </ul>
 <div id="tab0" class="tab">
+<h2>Failed tests</h2>
+<ul class="linkList">
+<li>
+<a href="classes/io.supernode.storage.erasure.ErasureCoderTest$GaloisFieldTests.html">GF(2^8) Math</a>.
+<a href="classes/io.supernode.storage.erasure.ErasureCoderTest$GaloisFieldTests.html#parityChangesWithData()">parity should change when data changes</a>
+</li>
+</ul>
+</div>
+<div id="tab1" class="tab">
 <h2>Packages</h2>
 <table>
 <thead>
@@ -79,19 +91,19 @@
 </thead>
 <tbody>
 <tr>
-<td class="success">
-<a href="packages/io.supernode.network.transport.html">io.supernode.network.transport</a>
+<td class="failures">
+<a href="packages/io.supernode.storage.erasure.html">io.supernode.storage.erasure</a>
 </td>
-<td>40</td>
+<td>1</td>
+<td>1</td>
 <td>0</td>
-<td>0</td>
-<td>4.019s</td>
-<td class="success">100%</td>
+<td>0.049s</td>
+<td class="failures">0%</td>
 </tr>
 </tbody>
 </table>
 </div>
-<div id="tab1" class="tab">
+<div id="tab2" class="tab">
 <h2>Classes</h2>
 <table>
 <thead>
@@ -106,124 +118,14 @@
 </thead>
 <tbody>
 <tr>
-<td class="success">
-<a href="classes/io.supernode.network.transport.TransportManagerTest$AddressResolutionTests.html">io.supernode.network.transport.TransportManagerTest$AddressResolutionTests</a>
-</td>
-<td>3</td>
-<td>0</td>
-<td>0</td>
-<td>0.346s</td>
-<td class="success">100%</td>
-</tr>
-<tr>
-<td class="success">
-<a href="classes/io.supernode.network.transport.TransportManagerTest$AvailabilityTests.html">io.supernode.network.transport.TransportManagerTest$AvailabilityTests</a>
-</td>
-<td>3</td>
-<td>0</td>
-<td>0</td>
-<td>0.313s</td>
-<td class="success">100%</td>
-</tr>
-<tr>
-<td class="success">
-<a href="classes/io.supernode.network.transport.TransportManagerTest$CircuitBreakerTests.html">io.supernode.network.transport.TransportManagerTest$CircuitBreakerTests</a>
-</td>
-<td>3</td>
-<td>0</td>
-<td>0</td>
-<td>0.290s</td>
-<td class="success">100%</td>
-</tr>
-<tr>
-<td class="success">
-<a href="classes/io.supernode.network.transport.TransportManagerTest$ConnectionTests.html">io.supernode.network.transport.TransportManagerTest$ConnectionTests</a>
-</td>
-<td>3</td>
-<td>0</td>
-<td>0</td>
-<td>0.008s</td>
-<td class="success">100%</td>
-</tr>
-<tr>
-<td class="success">
-<a href="classes/io.supernode.network.transport.TransportManagerTest$EventTests.html">io.supernode.network.transport.TransportManagerTest$EventTests</a>
-</td>
-<td>4</td>
-<td>0</td>
-<td>0</td>
-<td>0.007s</td>
-<td class="success">100%</td>
-</tr>
-<tr>
-<td class="success">
-<a href="classes/io.supernode.network.transport.TransportManagerTest$FailoverTests.html">io.supernode.network.transport.TransportManagerTest$FailoverTests</a>
+<td class="failures">
+<a href="classes/io.supernode.storage.erasure.ErasureCoderTest$GaloisFieldTests.html">io.supernode.storage.erasure.ErasureCoderTest$GaloisFieldTests</a>
 </td>
 <td>1</td>
+<td>1</td>
 <td>0</td>
-<td>0</td>
-<td>0.037s</td>
-<td class="success">100%</td>
-</tr>
-<tr>
-<td class="success">
-<a href="classes/io.supernode.network.transport.TransportManagerTest$HealthMonitoringTests.html">io.supernode.network.transport.TransportManagerTest$HealthMonitoringTests</a>
-</td>
-<td>4</td>
-<td>0</td>
-<td>0</td>
-<td>0.624s</td>
-<td class="success">100%</td>
-</tr>
-<tr>
-<td class="success">
-<a href="classes/io.supernode.network.transport.TransportManagerTest$LifecycleTests.html">io.supernode.network.transport.TransportManagerTest$LifecycleTests</a>
-</td>
-<td>5</td>
-<td>0</td>
-<td>0</td>
-<td>0.623s</td>
-<td class="success">100%</td>
-</tr>
-<tr>
-<td class="success">
-<a href="classes/io.supernode.network.transport.TransportManagerTest$LoadBalancingTests.html">io.supernode.network.transport.TransportManagerTest$LoadBalancingTests</a>
-</td>
-<td>3</td>
-<td>0</td>
-<td>0</td>
-<td>0.586s</td>
-<td class="success">100%</td>
-</tr>
-<tr>
-<td class="success">
-<a href="classes/io.supernode.network.transport.TransportManagerTest$ManagerOptionsTests.html">io.supernode.network.transport.TransportManagerTest$ManagerOptionsTests</a>
-</td>
-<td>2</td>
-<td>0</td>
-<td>0</td>
-<td>0.009s</td>
-<td class="success">100%</td>
-</tr>
-<tr>
-<td class="success">
-<a href="classes/io.supernode.network.transport.TransportManagerTest$RegistrationTests.html">io.supernode.network.transport.TransportManagerTest$RegistrationTests</a>
-</td>
-<td>5</td>
-<td>0</td>
-<td>0</td>
-<td>0.688s</td>
-<td class="success">100%</td>
-</tr>
-<tr>
-<td class="success">
-<a href="classes/io.supernode.network.transport.TransportManagerTest$StatsTests.html">io.supernode.network.transport.TransportManagerTest$StatsTests</a>
-</td>
-<td>4</td>
-<td>0</td>
-<td>0</td>
-<td>0.488s</td>
-<td class="success">100%</td>
+<td>0.049s</td>
+<td class="failures">0%</td>
 </tr>
 </tbody>
 </table>
@@ -236,7 +138,7 @@
 <input id="line-wrapping-toggle" type="checkbox" autocomplete="off"/>
 </label>
 </div>Generated by 
-<a href="http://www.gradle.org">Gradle 8.5</a> at Jan 12, 2026, 7:30:20 AM</p>
+<a href="http://www.gradle.org">Gradle 8.5</a> at Jan 18, 2026, 1:09:53 AM</p>
 </div>
 </div>
 </body>
